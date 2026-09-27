@@ -3,7 +3,8 @@
   "files": {
     ".gitignore": "4971418b4e68f1ea0feccd0ad3baa5ebc5ccc6c182c20a6193523d00a1cf762f",
     "LICENSE": "f9dbedc340acdaceb75a4b46d27a3a740945b651da7d50ce5f4490760f941b70",
-    "README.md": "b981c91afc2878fff22c6a3dc335fd8bae2d91204951a52f89217948329139d3",
+    "README.md": "9746ae5ee1aeab91d0f406c7f0b25a7774bfa7655a7e466ab010e7e9c69d5ebc",
+    "assets/exact-replay.png": "27ef77f2faf3d86939f9aa7274978b8190e33d659b96587e0230f47a58ba5d38",
     "algebraic_compiler/__init__.py": "68da13c5e45d08141abc5066d8f775f037821924736d9063b5c6867449d621d3",
     "algebraic_compiler/__main__.py": "1e2418d430306026fddac15539da8b0a9f386bc89723553272f84b42fbd4847f",
     "algebraic_compiler/compiler.py": "79fdf0aefbb4cd09bcfd991570a1bf9bc33a047c49ce969a6188850821e6ae27",
