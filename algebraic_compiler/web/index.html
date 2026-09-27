@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Algebraic Constraint Compiler</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header><a href="/" class="brand">ACC<span>Algebraic Constraint Compiler</span></a><span class="pill">LOCAL · EXACT RATIONALS</span></header>
+<main>
+<section class="hero"><p class="eyebrow">A CHECKABLE ANSWER, NOT A PLAUSIBLE GUESS</p><h1>Give the claim<br>a witness.</h1><p class="thesis">AI interprets. Compiler calculates. Verifier certifies.</p><p>Can a promising first step actually extend?<br>Compile a model. Inspect the evidence. Verify it independently.</p></section>
+<div class="boundary">Exact workbench · General finite-dimensional fixed A, V, B over ℚ · Passes 1–6 · supplied point & direction</div>
+<p id="agent-status" class="muted" role="status">No browser agent connected · Manual compilation and HTTP MCP remain available</p>
+<section class="workspace">
+<article class="panel"><p class="eyebrow">01 / DEFINE THE CLAIM</p><h2>A model you can inspect</h2>
+<label for="example">Start with an exact example</label><select id="example"><option value="second-order-obstructed">First order passes. Second order fails.</option><option value="second-order-extends">Find an exact second-order correction</option><option value="weak-consistent">Reconstruct a hidden action</option><option value="weak-inconsistent">Find a contradiction</option><option value="strict-point-valid">Validate a strict candidate</option><option value="custom" disabled>Imported / edited model</option></select>
+<p id="example-note" class="muted"></p>
+<details><summary>Inspect / edit typed specification</summary><label for="spec">Candidate JSON · omitted sparse coefficients are zero</label><textarea id="spec" spellcheck="false"></textarea></details>
+<button id="compile" class="primary">Compile & check →</button><p class="muted">Runs the exact Python compiler and independent verifier now. No stored result is substituted.</p>
+</article>
+<article class="panel result"><p class="eyebrow">02 / FOLLOW THE EVIDENCE</p><div id="status" class="pill">READY TO COMPILE</div><h2 id="result-title">A claim is not yet a certificate.</h2><p id="meaning">Choose an example to see what can be certified—and what cannot.</p><ol id="passes"></ol><ul id="facts"></ul><p id="digest" class="digest"></p></article>
+</section>
+<section class="panel certificate"><div><p class="eyebrow">03 / TRUST YOU CAN REPLAY</p><h2>Take the evidence with you.</h2><p>Export the complete bundle, or import one in a fresh session.<br>The verifier checks witnesses, not just their hashes.</p></div><div class="actions"><button id="download" disabled>Export bundle</button><label class="file-button" for="upload">Import bundle<input id="upload" type="file" accept=".json,application/json"></label><button id="verify" disabled>Replay independently</button><button id="tamper" disabled>Try a rehashed forgery</button></div><p id="replay" role="status" aria-live="polite">No bundle loaded.</p><details><summary>Inspect / edit replay bundle</summary><label for="bundle">Exact JSON · edits require another replay</label><textarea id="bundle" spellcheck="false"></textarea></details></section>
+<p id="error" role="alert"></p>
+<footer>Proof boundary: weak consistency ≠ strict validity ≠ deformation extendability.<br>Certificates are portable replay records. They are not proof-assistant formalizations.</footer>
+</main></body></html>

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "algebraic-constraint-compiler"
+version = "0.2.0"
+description = "Exact reconstruction and second-order obstruction with independently replayable certificates"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp==1.30.0; python_version >= '3.10'"]
+
+[project.scripts]
+acc = "algebraic_compiler.__main__:main"
+
+[tool.setuptools]
+packages = ["algebraic_compiler"]
+
+[tool.setuptools.package-data]
+algebraic_compiler = ["web/*.html", "web/*.css", "web/*.js"]

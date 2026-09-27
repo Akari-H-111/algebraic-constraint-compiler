@@ -1,0 +1,139 @@
+{
+  "schema_version": "1",
+  "problem_id": "second-order-obstructed",
+  "mode": "fixed_A_V_B",
+  "requested_passes": [
+    "structure",
+    "observability",
+    "weak",
+    "strict",
+    "tangent",
+    "obstruction"
+  ],
+  "algebra": {
+    "schema_version": "1",
+    "id": "A",
+    "field": {
+      "kind": "Q",
+      "characteristic": 0
+    },
+    "basis": [
+      "1",
+      "epsilon"
+    ],
+    "unit": {
+      "coordinates": [
+        {
+          "num": 1,
+          "den": 1
+        },
+        {
+          "num": 0,
+          "den": 1
+        }
+      ]
+    },
+    "multiplication": [
+      {
+        "i": 0,
+        "j": 0,
+        "k": 0,
+        "value": {
+          "num": 1,
+          "den": 1
+        }
+      },
+      {
+        "i": 0,
+        "j": 1,
+        "k": 1,
+        "value": {
+          "num": 1,
+          "den": 1
+        }
+      },
+      {
+        "i": 1,
+        "j": 0,
+        "k": 1,
+        "value": {
+          "num": 1,
+          "den": 1
+        }
+      }
+    ]
+  },
+  "space": {
+    "schema_version": "1",
+    "id": "V",
+    "field": {
+      "kind": "Q",
+      "characteristic": 0
+    },
+    "basis": [
+      "v"
+    ]
+  },
+  "B": {
+    "schema_version": "1",
+    "id": "B",
+    "left_algebra_id": "A",
+    "right_algebra_id": "A",
+    "codomain_space_id": "V",
+    "entries": [
+      {
+        "i": 1,
+        "j": 1,
+        "beta": 0,
+        "value": {
+          "num": 1,
+          "den": 1
+        }
+      }
+    ]
+  },
+  "strict_point": {
+    "schema_version": "1",
+    "coordinate_system": "action_entries",
+    "coordinates": [
+      {
+        "num": 1,
+        "den": 1
+      },
+      {
+        "num": 0,
+        "den": 1
+      },
+      {
+        "num": 1,
+        "den": 1
+      },
+      {
+        "num": 0,
+        "den": 1
+      }
+    ]
+  },
+  "tangent_direction": {
+    "schema_version": "1",
+    "coordinate_system": "action_entries",
+    "coordinates": [
+      {
+        "num": 0,
+        "den": 1
+      },
+      {
+        "num": 1,
+        "den": 1
+      },
+      {
+        "num": 0,
+        "den": 1
+      },
+      {
+        "num": -1,
+        "den": 1
+      }
+    ]
+  }
+}
