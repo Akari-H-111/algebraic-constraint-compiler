@@ -3,7 +3,7 @@
   "files": {
     ".gitignore": "4971418b4e68f1ea0feccd0ad3baa5ebc5ccc6c182c20a6193523d00a1cf762f",
     "LICENSE": "f9dbedc340acdaceb75a4b46d27a3a740945b651da7d50ce5f4490760f941b70",
-    "README.md": "05e14eb9a940486e87e342a5f237dc94972e651f0b5dcd680e064388f27f0659",
+    "README.md": "b981c91afc2878fff22c6a3dc335fd8bae2d91204951a52f89217948329139d3",
     "algebraic_compiler/__init__.py": "68da13c5e45d08141abc5066d8f775f037821924736d9063b5c6867449d621d3",
     "algebraic_compiler/__main__.py": "1e2418d430306026fddac15539da8b0a9f386bc89723553272f84b42fbd4847f",
     "algebraic_compiler/compiler.py": "79fdf0aefbb4cd09bcfd991570a1bf9bc33a047c49ce969a6188850821e6ae27",
@@ -11,10 +11,10 @@
     "algebraic_compiler/ir.py": "11c525c568ccbd3efcdfccdcd597bb73cc70fc6b1752036692c427c3bdd177ca",
     "algebraic_compiler/mcp_server.py": "4654344b46f1d79a23dd23f001743c717826c1ae6f4b0f42d02720a531f0978f",
     "algebraic_compiler/verifier.py": "49894943e4baa65a621c3e60f5fd9abbae984e2b517367235f0858b12e2522ed",
-    "algebraic_compiler/web/app.js": "b8f309d7775de8c541a216f8e0be3b5dcfb106b1780377fdd07d39f4c1c892c4",
-    "algebraic_compiler/web/index.html": "556a36744482f3cdebe5b1173c213a795dfbd53396133a22890c24c8c9f03d9c",
-    "algebraic_compiler/web/style.css": "8549392f8bfb49ab5383df7b7d9d296e9d3521b7703add42a7103cb7aa125733",
-    "algebraic_compiler/workbench.py": "f16a38522fa85e8eb90c2df97654273cd1b5acc546ff0759fee0160b68a4858f",
+    "algebraic_compiler/web/app.js": "94501765f90f51a2245f65c5fe6c12e92b63abd66a59bdcd44e0a5c43bc1d9fc",
+    "algebraic_compiler/web/index.html": "75ee3b41048138e039eb9bf00826645205219bb768e4a21dbf9f3585355890f0",
+    "algebraic_compiler/web/style.css": "b80c59c8d0383f1dcbb318088eb5240df2e8a467000b16dd01b8b8f28f90aafc",
+    "algebraic_compiler/workbench.py": "646b07421c11563455de761ebbfc8820ef655cef7f039d184610d5924253835d",
     "docs/math-contract.md": "e3e73f466d43c7046230ef104888daf4c83c491e38ecb1eed26d575a82c094c3",
     "examples/algebraic/second-order-extends.json": "7bec5566689eb72c7e07189629c17f6fd7bb31e8a6e06d2d7077ecfa1e8e09ea",
     "examples/algebraic/second-order-obstructed.json": "2115010d071c8941437508689e6946aa7dd2d7e7067ec19da62015f9e4c57621",
@@ -23,9 +23,10 @@
     "examples/algebraic/weak-inconsistent.json": "c5b543f15e9be76e54ec61ab3b15bb761ec881bcb1b8b2d195ab34cc9b972512",
     "friction-log.md": "51b1663790e4a045b03375ecb8ffb96008561a343ecbc0eb68951df9806b50c4",
     "pyproject.toml": "e0ae20b971e6093349c2ba0324114b39e08ce50824ea229fb67ce65c33a74f82",
+    "tests/check_agent_session.mjs": "76688bbd3a57196ee3f0409bb962ff9df623b8cd7e1cdc8ad771d9a26172c883",
     "tests/test_algebraic.py": "cfcce866b0e9c6eb829178af6c1d5af0c52364fc14d19a9d724b7ef6a3639e95",
     "tests/test_algebraic_mcp.py": "2d4fcb77bb85f1269a8f784d68d7f0dfdfe93d6c04bc1be36c9dd373c2e1a12d",
     "tests/test_deformation.py": "ad5ab92498c347c092f735c577118fb34215780b578301c796a41ff0b303dfe0",
-    "tests/test_workbench.py": "112baf18f80cd8a40942614244a6285bf4d5d90b6389b1743e8b4c48edae1d46"
+    "tests/test_workbench.py": "fa09ef316215c7db9a1dc5a847b4623933d6cc1b35206e03618f6f5f0874ec35"
   }
 }

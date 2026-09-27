@@ -2,17 +2,43 @@
 
 import argparse
 import copy
+from fractions import Fraction
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from pathlib import Path
+import re
 
 from .compiler import compile_reconstruction
-from .ir import InputError, MAX_BYTES, canonical, digest, load_json, rational, parse_problem, problem_schema
+from .ir import InputError, MAX_BYTES, canonical, digest, fields, load_json, rational, require, scalar, parse_problem, problem_schema
 from .verifier import verify_run
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = Path(__file__).with_name("web")
 EXAMPLES = ("second-order-obstructed", "second-order-extends", "weak-consistent", "weak-inconsistent", "strict-point-valid")
+
+
+def prepare_question(payload):
+    """Scale a supplied teaching direction exactly; this is not a proof or NLP parser."""
+    fields(payload, ("example", "scale"))
+    name, text = payload["example"], payload["scale"]
+    require(name in EXAMPLES[:2], "UNSUPPORTED", "Choose a second-order teaching model")
+    require(isinstance(text, str) and re.fullmatch(r"-?[0-9]{1,8}(?:/[0-9]{1,8})?", text),
+            "INVALID_SCHEMA", "Use an integer or fraction, up to 8 digits per part (for example 2 or -3/2)")
+    parts = text.split("/")
+    require(len(parts) == 1 or int(parts[1]) > 0, "INVALID_SCHEMA", "Denominator must be positive")
+    scale = Fraction(text)
+    model = load_json((ROOT / "examples/algebraic" / (name + ".json")).read_bytes())
+    model["tangent_direction"]["coordinates"] = [scalar(scale * rational(q)) for q in model["tangent_direction"]["coordinates"]]
+    candidate = parse_problem(model)
+    return {"status": "CANDIDATE_SPEC", "specification_json": candidate.spec_json.decode(),
+            "input_digest": candidate.sha256,
+            "user_request": "In the supplied " + ("one-dimensional" if name == EXAMPLES[0] else "two-dimensional") +
+                " dual-number teaching model, can " + str(scale) +
+                " times the original direction extend through second order at this fixed point? " +
+                "Calculate and independently replay an exact correction or obstruction witness." +
+                (" The zero direction is trivial." if not scale else ""),
+            "message": "Question prepared; no certificate yet. Only the supplied direction changes. " +
+                ("The zero direction is trivial. " if not scale else "") + "Higher orders and other points are outside this question."}
 
 
 def present(run):
@@ -150,7 +176,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.local_request():
             self.respond(403, b'{"error":"Local origin required"}')
             return
-        if self.path not in ("/api/compile", "/api/verify", "/api/tamper", "/api/candidate"):
+        if self.path not in ("/api/compile", "/api/verify", "/api/tamper", "/api/candidate", "/api/question"):
             self.respond(404, b'{"error":"Not found"}')
             return
         try:
@@ -160,6 +186,9 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 <= length <= MAX_BYTES:
                 raise InputError("RESOURCE_LIMIT", "Request exceeds byte limit")
             payload = load_json(self.rfile.read(length))
+            if self.path == "/api/question":
+                self.respond(200, canonical(prepare_question(payload)))
+                return
             if self.path == "/api/candidate":
                 candidate = parse_problem(payload)
                 self.respond(200, canonical({"status": "CANDIDATE_SPEC",

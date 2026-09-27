@@ -46,7 +46,12 @@ From this source checkout (Python standard library only):
 python3 -B -m algebraic_compiler.workbench --port 8765
 ```
 
-Open http://127.0.0.1:8765. Compile an editable example, inspect exact witnesses,
+Open http://127.0.0.1:8765. In either second-order teaching model, enter an exact
+direction multiplier (for example `2` or `-3/2`) and select **Prepare this question**.
+This stages a new typed candidate without certification; **Compile & check**
+then calculates and independently verifies it. Scaling always starts from the
+original fixture. Zero is explicitly a trivial direction; no higher-order claim
+is implied. You can also compile an editable example, inspect exact witnesses,
 export a bundle, import it in a fresh session and replay independently. The
 rehashed-forgery button changes witness data and recomputes its hash; the verifier
 still rejects it. Edited or imported data loses its verified badge until replay.
@@ -56,6 +61,10 @@ page tools let your agent read the schema, stage a candidate, compile the exact
 displayed model and replay its bundle. A changed specification is refused until
 the agent reads or stages it again. Codex exercised this real path on September 27;
 it is not an application-owned LLM loop or an actual Alexa+ account connection.
+The visible session activity lists actual host-agent reads, candidate staging,
+compiler results and independent replay, including failures and input digests.
+It is a session observation, not certificate evidence. The current mathematical
+claim remains in the result panel; history does not certify a changed model.
 Ordinary browsers retain the manual workflow. No paid API key is needed for the
 compiler or verifier. The MCP adapter below is separately tested over real HTTP.
 Certificates persist only when
@@ -105,7 +114,14 @@ python3 -B -m unittest discover -s tests -p 'test_deformation.py' -v
 Use Python >=3.10 for the optional MCP SDK. Do not count the optional
 MCP test as passed when it is skipped.
 
-Current evidence (2026-09-27): 40 tests passed in `.venv-acc`, zero skips,
+For the browser tool boundary, an optional Node >=18 check uses a minimal DOM
+harness with the real local HTTP backend (start the workbench first):
+
+```bash
+node tests/check_agent_session.mjs http://127.0.0.1:8765
+```
+
+Current local evidence (2026-09-27): 41 tests passed in `.venv-acc`, zero skips,
 including real MCP HTTP and both order-two cases. The independent verifier also
 accepts legacy 0.1.0 certificates for Passes 1–4; 0.2.0 adds tangent/obstruction.
 The two new rational fixtures are constructed computational examples, not recovered

@@ -79,6 +79,32 @@ class WorkbenchTests(unittest.TestCase):
         self.assertIn("have not been verified", data["message"])
         self.assertEqual(self.request("/api/candidate", b'{}')[0], 400)
 
+    def test_guided_question_exact_scaling_and_certified_limits(self):
+        for name, scale, expected in (("second-order-extends", "2", "η L(epsilon)[2,1] = -4"),
+                                      ("second-order-extends", "-3/2", "η L(epsilon)[2,1] = -9/4"),
+                                      ("second-order-obstructed", "2", "λᵀQₚ(ξ) = 4"),
+                                      ("second-order-obstructed", "0", "Exact correction η = 0")):
+            original = load_json((ROOT / "examples/algebraic" / (name + ".json")).read_bytes())
+            with patch("algebraic_compiler.workbench.compile_reconstruction", side_effect=RuntimeError("No proof during preparation")):
+                code, content = self.request("/api/question", canonical({"example": name, "scale": scale}))
+            data = json.loads(content)
+            self.assertEqual(code, 200)
+            self.assertNotIn("certificate_verified", data)
+            candidate = load_json(data["specification_json"])
+            self.assertEqual(candidate["strict_point"], original["strict_point"])
+            self.assertEqual(candidate["algebra"], original["algebra"])
+            _, content = self.request("/api/compile", data["specification_json"].encode())
+            run = json.loads(content)
+            self.assertTrue(run["replay"]["certificate_verified"])
+            self.assertIn(expected, run["view"]["facts"])
+            with patch("algebraic_compiler.compiler.weak", side_effect=RuntimeError("No solver during replay")):
+                _, content = self.request("/api/verify", run["bundle"].encode())
+            self.assertTrue(json.loads(content)["replay"]["certificate_verified"])
+        for scale in ("0.5", "1/0", "1/-2", "1e3", "123456789", 2, "", "2/3/4"):
+            self.assertEqual(self.request("/api/question", canonical({"example": "second-order-extends", "scale": scale}))[0], 400)
+        self.assertEqual(self.request("/api/question", canonical({"example": "weak-consistent", "scale": "2"}))[0], 400)
+        self.assertEqual(self.request("/api/question", b'{}')[0], 400)
+
     def test_local_origin_payload_and_static_boundaries(self):
         self.assertEqual(self.request("/")[0], 200)
         self.assertEqual(self.request("/.git/config")[0], 404)
