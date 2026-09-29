@@ -1,12 +1,12 @@
 {
-  "version": "0.3.0",
+  "version": "0.3.1",
   "files": {
     ".github/workflows/ci.yml": "cdbcfb20ec09397f24a3ce3e4099c641dc42986916e17560d942af94b7566ef9",
     ".gitignore": "87bdace948add6a57b5e03e01f0d14f04cfb70b1b65f721546aad835b0cc8ec2",
     "Dockerfile": "03f379b5681276bf2d531e85d1d9279f4ed07d5e1af32c266db9715b0ad5dc48",
     "LICENSE": "f9dbedc340acdaceb75a4b46d27a3a740945b651da7d50ce5f4490760f941b70",
-    "README.md": "7470ec176f4cfc0890c4eceef0d35ffb7912bb88805047d38273b4fe40f9c000",
-    "algebraic_compiler/__init__.py": "dae66506b0f7a5b59baf70857f6ba93e30b5940b0a9583a77ff4c8a17f168076",
+    "README.md": "c5ae006724d7deaad241b706d6562dc172c301e600c6a4439f045443297eef05",
+    "algebraic_compiler/__init__.py": "0840d485d2ae67c4789ba1739416f0841c6dbc3dbe9c7d062694a10f6c377519",
     "algebraic_compiler/__main__.py": "1e2418d430306026fddac15539da8b0a9f386bc89723553272f84b42fbd4847f",
     "algebraic_compiler/compiler.py": "79fdf0aefbb4cd09bcfd991570a1bf9bc33a047c49ce969a6188850821e6ae27",
     "algebraic_compiler/deformation.py": "8bf9c978af88caba87db5749a229ba563b13123ace1206168bdca6013c682912",
@@ -23,11 +23,11 @@
     "algebraic_compiler/simulator.py": "2f3c44b55c602765b67ca91fd00071363d6e07255f61a47a7c638d6a9b77be34",
     "algebraic_compiler/verifier.py": "49894943e4baa65a621c3e60f5fd9abbae984e2b517367235f0858b12e2522ed",
     "algebraic_compiler/web/alexa/alexa.css": "c8bf6945acdd4909d77c3b41f0933e1ba773d7335946585b03fa60b04ed703f5",
-    "algebraic_compiler/web/alexa/alexa.js": "daa0e0d7bf6316d8ef7732db82dca750dafdf0994ed02451763bf320373e273e",
+    "algebraic_compiler/web/alexa/alexa.js": "556432d9d223907b7b51e999c25a3acd4f43310ffa6168e4fd3e9c7eab7c781f",
     "algebraic_compiler/web/alexa/index.html": "034ec93c633968c6879f8dc93f8652b20d637e06844f401d5103146e253e10ed",
     "algebraic_compiler/web/alexa/sandbox.html": "4923217c263e8707f463f2ada630a004de8ce9b352cbb3db96337e99ef74dc6f",
     "algebraic_compiler/web/app.js": "94501765f90f51a2245f65c5fe6c12e92b63abd66a59bdcd44e0a5c43bc1d9fc",
-    "algebraic_compiler/web/card.html": "2fddfc74c1e41d4c09089fbc2defcc01e27d8feb91cddc94c1c8bce0ababf41d",
+    "algebraic_compiler/web/card.html": "692d853b09f77b4eb44f0c3b3aad103ad93ab7d59a22c2d6c2e81681907ae589",
     "algebraic_compiler/web/index.html": "db5a1076b717e6ab38319d443b0f9dcd697487ee433171773e64d4f8c4756164",
     "algebraic_compiler/web/style.css": "08c2bb73ecd544cb08d2ba3e599d10e6519404afdbe27771b6d2f0033581e6e0",
     "algebraic_compiler/workbench.py": "646b07421c11563455de761ebbfc8820ef655cef7f039d184610d5924253835d",
@@ -45,7 +45,7 @@
     "examples/algebraic/weak-consistent.json": "c4c584c34dd11f41ed23183a5184c850ea604597e9cb67cead1913d8ff34fa35",
     "examples/algebraic/weak-inconsistent.json": "c5b543f15e9be76e54ec61ab3b15bb761ec881bcb1b8b2d195ab34cc9b972512",
     "friction-log.md": "640f5293a9458ec867ff49e217ac7238cefcfbdf051444c8c8f483f327a36862",
-    "pyproject.toml": "f916600843dbdd9cb81d579d82c0f5f5aaa1401382ffdacad95c0e90083d4818",
+    "pyproject.toml": "c4ccde8b9b961152741898c7d403597c3270a68661e7b02a1f2093576cc49252",
     "skills/show-your-work/SKILL.md": "5603b70ba9505e9a2867e882275178c166705b93ea3d4b86517425a55bcb8f7c",
     "tests/check_agent_session.mjs": "76688bbd3a57196ee3f0409bb962ff9df623b8cd7e1cdc8ad771d9a26172c883",
     "tests/test_algebraic.py": "cfcce866b0e9c6eb829178af6c1d5af0c52364fc14d19a9d724b7ef6a3639e95",
@@ -57,9 +57,12 @@
     "tests/test_simulator.py": "a9b4245765bdcda546fe44766a3b0e6887faa16d9bc4e5d9824167d2689bc9f0",
     "tests/test_workbench.py": "fa09ef316215c7db9a1dc5a847b4623933d6cc1b35206e03618f6f5f0874ec35",
     "tools/cdp.mjs": "c9ba8318fe9582709df55ee1cc0e5794a49a930bf973829d44d25fcce298cbe6",
+    "tools/site/build_site.py": "e2e034062ddd50b97d22a1107d75710de0e4ea411b8bb019b4d0a52501cd7bd0",
+    "tools/site/static-backend.js": "deb4af674b9056037dd259faa874839fd1eaaa65824c8c94dda6d459f7f13cd5",
     "tools/video/build.py": "73661330899d90af9080b3792033146c3a09f6f1996b0d36588a6a154cc05c21",
     "tools/video/cards.html": "b499d724aba21b7e77e9eea48758c4246cb33681fbe33bd778374a7034832872",
     "tools/video/narration.json": "853ab248455c65f74cc1981cd1f655ebe4db27786d6bfac6ebb0a20e45931a7d",
-    "tools/video/record.mjs": "963f0730972e6a781e2dd20031d83527786ac65295c583cec133ac42ae616218"
+    "tools/video/record.mjs": "963f0730972e6a781e2dd20031d83527786ac65295c583cec133ac42ae616218",
+    "tools/video/thumbnail.html": "a5249ae0e68d2ec17feffbf643f2a270f9304fb6dcf17694fbd9645bcdea1771"
   }
 }

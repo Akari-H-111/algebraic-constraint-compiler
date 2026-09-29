@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Show Your Work thumbnail</title>
+<style>
+:root{--bg:#070a10;--text:#eef2fb;--muted:#9aa6bf;--accent:#27d3ff;--accent2:#5b7cff;--warn:#ffb14a;--ok:#3ccf91;--line:#222b3d}
+*{box-sizing:border-box}
+html,body{margin:0;width:1500px;height:1000px;overflow:hidden;background:radial-gradient(1200px 800px at 15% -10%,#18284d 0%,var(--bg) 60%);color:var(--text);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
+.left{position:absolute;left:80px;top:90px;width:560px}
+.logo{width:84px;height:84px;border-radius:24px;display:grid;place-items:center;font-size:50px;font-weight:800;color:#061018;background:linear-gradient(135deg,var(--accent),var(--accent2));margin-bottom:30px}
+h1{font-size:92px;line-height:.98;margin:0 0 22px;letter-spacing:-.04em}
+.sub{font-size:36px;line-height:1.2;color:#cfd7ea;margin:0 0 34px}
+.chips{display:flex;flex-direction:column;gap:14px}
+.chip{font-size:25px;color:var(--muted)}.chip b{color:var(--text)}
+.thesis{position:absolute;left:80px;bottom:70px;font-size:28px;font-weight:650;color:var(--muted)}
+.thesis span{color:var(--accent)}
+.shot{position:absolute;right:50px;top:140px;width:780px;height:500px;border-radius:24px;overflow:hidden;border:12px solid #13161d;box-shadow:0 40px 90px rgba(0,0,0,.6);transform:perspective(1800px) rotateY(-7deg)}
+.shot img{position:absolute;display:block;width:1470px;left:-196px;top:-66px}
+.badge{position:absolute;right:70px;top:66px;font-size:22px;color:var(--warn);border:1px solid rgba(255,177,74,.45);border-radius:999px;padding:8px 16px;background:rgba(255,177,74,.08)}
+</style>
+</head>
+<body>
+<div class="left">
+  <div class="logo">✓</div>
+  <h1>Show Your Work</h1>
+  <p class="sub">Math answers Alexa+ can prove.</p>
+  <div class="chips">
+    <div class="chip"><b>Finds the exact wrong step</b> in a child's homework</div>
+    <div class="chip"><b>Catches impossible</b> worksheet problems</div>
+    <div class="chip"><b>Every answer replayed</b> by an independent verifier</div>
+    <div class="chip"><b>MCP 2025-11-25</b> · MCP Apps · Claude &amp; Gemini</div>
+  </div>
+</div>
+<div class="badge">Mistake found · certified</div>
+<div class="shot"><img src="../../docs/images/homework-check.png" alt=""></div>
+<p class="thesis">AI <span>interprets</span>. Compiler <span>calculates</span>. Verifier <span>certifies</span>.</p>
+</body>
+</html>

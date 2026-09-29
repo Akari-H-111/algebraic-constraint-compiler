@@ -10,6 +10,10 @@ written, and remembers each learner's progress across sessions. Every result
 comes with a portable certificate that anyone can re-check without trusting
 the assistant.
 
+**Try it now, no install:** [akari-h-111.github.io/algebraic-constraint-compiler](https://akari-h-111.github.io/algebraic-constraint-compiler/).
+The web demo runs the real Python compiler and verifier in your browser (Guided requests, no AI). For voice, the
+Claude or Gemini agent and the MCP server, run it locally (below).
+
 ![Simulated Alexa+ display checking a child's homework: the mistake is on line 1 → 2, with the typed equations, a hint, the proof, and a verified certificate](docs/images/homework-check.png)
 
 ## Why
@@ -93,14 +97,19 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[mcp]'
 
 Open http://127.0.0.1:8787. The simulator starts the MCP server for you.
 Without a model key it runs in **Guided mode**: preset typed requests call the
-same MCP tools directly, clearly labelled as involving no AI. To talk freely
-by voice or text, set one model provider before starting:
+same MCP tools directly, clearly labelled as involving no AI. To talk freely by
+voice or text, put one or more keys in a git-ignored `.env` file in the project
+root (the simulator reads it and never sends keys to the browser):
 
 ```bash
-export AWS_BEARER_TOKEN_BEDROCK=...   # Amazon Bedrock (default model: Amazon Nova Lite)
-export ANTHROPIC_API_KEY=...          # Claude, via the official SDK: pip install -e '.[claude]'
-export GEMINI_API_KEY=...             # Gemini, via its OpenAI-compatible endpoint
+ANTHROPIC_API_KEY=...          # Claude (claude-opus-5-5) via the official SDK: pip install -e '.[claude]'
+GEMINI_API_KEY=...             # Gemini (gemini-2.5-flash) via its OpenAI-compatible endpoint
+AWS_BEARER_TOKEN_BEDROCK=...   # Amazon Bedrock (Amazon Nova Lite)
 ```
+
+With more than one key set, a switch in the top bar changes the agent's model
+live. The certificate for the same typed model doesn't change, because neither
+model calculates.
 
 ### Use it from any MCP host
 
@@ -156,7 +165,10 @@ The suite on Python 3.14 with MCP SDK 1.30.0 (zero skips) covers:
   agent loop over real HTTP.
 
 A headless-Chrome script ([tools/cdp.mjs](tools/cdp.mjs)) drives the
-simulator for visual QA and demo capture.
+simulator for visual QA and demo capture. The MCP Apps host side (sandbox
+proxy, CSP injection, handshake, message log) is also released as a separate
+open-source tool, [mcp-apps-preview](https://github.com/Akari-H-111/mcp-apps-preview).
+Show Your Work passes its SEP-1865 lint with 0 errors and 0 warnings.
 
 ## Limits (on purpose)
 

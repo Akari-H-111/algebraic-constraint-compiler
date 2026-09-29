@@ -9,7 +9,11 @@
 
   // ---------- helpers ----------
   const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  // A static build (GitHub Pages) supplies window.SYW_BACKEND, which runs the same Python
+  // compiler and verifier in the browser; otherwise the simulator server answers.
+  const STATIC = typeof window.SYW_BACKEND === 'function';
   async function api(path, body) {
+    if (STATIC) return window.SYW_BACKEND(path, body);
     const response = await fetch(path, body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : undefined);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || ('HTTP ' + response.status));
@@ -92,7 +96,7 @@
     if (ev.type === 'heard') { add(ev.guided ? 'guided' : 'heard', ev.guided ? 'Preset typed request (no AI)' : 'Speech → text'); detail.textContent = '“' + ev.text + '”'; }
     else if (ev.type === 'model') { add('AI interprets', `${MODEL_NAMES[ev.provider] || ev.provider} · ${ev.model}`); detail.textContent = ev.tool_calls.length ? 'Chose MCP tool: ' + ev.tool_calls.join(', ') : 'Composed the spoken reply'; }
     else if (ev.type === 'tool') {
-      add('MCP tools/call', ev.name);
+      add(STATIC ? 'engine call' : 'MCP tools/call', ev.name);
       if (ev.error) { detail.className += ' error'; detail.textContent = ev.error; }
       else {
         const args = Object.assign({}, ev.arguments); delete args.notebook; delete args.learner;
@@ -115,14 +119,21 @@
 
   // ---------- MCP Apps host ----------
   class AppHost {
-    constructor(slot) { this.slot = slot; this.frame = null; this.card = null; this.resource = null; this.origin = sandboxOrigin(); window.addEventListener('message', e => this.onMessage(e)); }
+    constructor(slot) { this.slot = slot; this.frame = null; this.card = null; this.resource = null; this.origin = STATIC ? 'null' : sandboxOrigin(); window.addEventListener('message', e => this.onMessage(e)); }
     async show(card) {
       this.card = card;
       this.resource = await api('/api/resource?uri=' + encodeURIComponent(card.resourceUri));
       const frame = document.createElement('iframe');
-      frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
       frame.setAttribute('title', 'Certificate card (MCP App)');
-      frame.src = this.origin + '/sandbox.html';
+      if (STATIC) {
+        // Single-origin static hosting: the view runs in an opaque-origin srcdoc frame with the same CSP.
+        const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'";
+        frame.setAttribute('sandbox', 'allow-scripts');
+        frame.srcdoc = this.resource.text.replace(/<head[^>]*>/i, m => m + `<meta http-equiv="Content-Security-Policy" content="${csp}">`);
+      } else {
+        frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        frame.src = this.origin + '/sandbox.html';
+      }
       $('conversation').classList.add('compact');
       this.slot.replaceChildren(frame); this.slot.hidden = false;
       this.frame = frame;
@@ -133,7 +144,7 @@
       if (!this.frame) return;
       this.frame.style.height = Math.max(160, this.slot.clientHeight) + 'px';
     }
-    post(message) { if (this.frame) this.frame.contentWindow.postMessage(message, this.origin); }
+    post(message) { if (this.frame) this.frame.contentWindow.postMessage(message, STATIC ? '*' : this.origin); }
     reply(id, result) { this.post({jsonrpc: '2.0', id, result}); }
     fail(id, message, code) { this.post({jsonrpc: '2.0', id, error: {code: code || -32000, message}}); }
     context() {
@@ -233,7 +244,8 @@
       state.config = cfg;
       $('household').textContent = cfg.notebook.replace(/\b\w/g, c => c.toUpperCase()) + ' · ' + cfg.learner;
       const mcp = $('mcp-pill');
-      if (cfg.connected) { mcp.textContent = `MCP · ${cfg.protocol} · ${cfg.tools.length} tools`; mcp.className = 'pill ok'; }
+      if (cfg.static) { mcp.textContent = 'Engine · exact Python in your browser'; mcp.className = 'pill ok'; }
+      else if (cfg.connected) { mcp.textContent = `MCP · ${cfg.protocol} · ${cfg.tools.length} tools`; mcp.className = 'pill ok'; }
       else { mcp.textContent = 'MCP · not connected'; mcp.className = 'pill warn'; }
       const model = $('model-pill'), sw = $('model-switch');
       state.provider = state.provider || cfg.provider;
@@ -250,6 +262,7 @@
       const note = $('mode-note');
       note.replaceChildren();
       if (cfg.provider) note.append('Talk freely, or try: ');
+      else if (cfg.static) { const b = el('b', null, 'Web demo: '); note.append(b, 'preset typed requests (no AI) run the real compiler and verifier in your browser. Tap one:'); }
       else { const b = el('b', null, 'Guided mode: '); note.append(b, 'no AI model is configured, so these preset typed requests call the same MCP tools directly. Configure Bedrock, Claude or Gemini to talk freely.'); }
       const box = $('scenarios'); box.replaceChildren();
       cfg.scenarios.forEach(s => { const b = el('button', null, s.label); b.type = 'button'; b.title = s.utterance; b.onclick = () => cfg.provider ? submit(s.utterance) : guided(s); box.append(b); });
