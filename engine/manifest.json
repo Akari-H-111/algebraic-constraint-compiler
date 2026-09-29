@@ -1,0 +1,13 @@
+{
+ "files": [
+  "algebraic_compiler/__init__.py",
+  "algebraic_compiler/ir.py",
+  "algebraic_compiler/linear_ir.py",
+  "algebraic_compiler/linear.py",
+  "algebraic_compiler/linear_verifier.py",
+  "algebraic_compiler/linear_view.py",
+  "algebraic_compiler/service.py",
+  "algebraic_compiler/notebook.py",
+  "algebraic_compiler/web/card.html"
+ ]
+}

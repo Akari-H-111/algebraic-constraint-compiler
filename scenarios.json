@@ -1,0 +1,84 @@
+[
+ {
+  "id": "work",
+  "label": "Check Maya's homework",
+  "utterance": "Alexa, check Maya's homework. The problem is 3x + 5 = 20. She wrote 3x = 25, then x = 25 over 3.",
+  "tool": "check_work",
+  "arguments": {
+   "steps": [
+    [
+     "3x + 5 = 20"
+    ],
+    [
+     "3x = 25"
+    ],
+    [
+     "x = 25/3"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "tickets",
+  "label": "A worksheet with a typo",
+  "utterance": "Alexa, adult tickets cost $12 and child tickets cost $7. They sold 20 tickets for $300. How many child tickets?",
+  "tool": "solve_equations",
+  "arguments": {
+   "equations": [
+    "a + c = 20",
+    "12a + 7c = 300"
+   ],
+   "domain": "nonnegative_integer",
+   "labels": {
+    "a": "adult tickets",
+    "c": "child tickets"
+   },
+   "question": "Adult tickets cost $12 and child tickets cost $7. 20 tickets sold for $300. How many child tickets?"
+  }
+ },
+ {
+  "id": "practice",
+  "label": "Practice problem",
+  "utterance": "Alexa, give Maya a practice problem like that one.",
+  "tool": "practice_problem",
+  "arguments": {
+   "kind": "two_step",
+   "seed": 2026
+  }
+ },
+ {
+  "id": "answer",
+  "label": "Is x = 4 right?",
+  "utterance": "Alexa, Maya says x equals 4 for 2x - 7 = 1. Is that right?",
+  "tool": "check_answer",
+  "arguments": {
+   "equations": [
+    "2x - 7 = 1"
+   ],
+   "answer": {
+    "x": "4"
+   }
+  }
+ },
+ {
+  "id": "system",
+  "label": "Two equations",
+  "utterance": "Alexa, solve x + y = 10 and x - y = 2.",
+  "tool": "solve_equations",
+  "arguments": {
+   "equations": [
+    "x + y = 10",
+    "x - y = 2"
+   ]
+  }
+ },
+ {
+  "id": "progress",
+  "label": "How is Maya doing?",
+  "utterance": "Alexa, how is Maya doing with math this week?",
+  "tool": "progress_report",
+  "arguments": {
+   "days": 7
+  }
+ }
+]
