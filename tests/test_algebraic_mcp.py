@@ -56,8 +56,9 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 initialized = await client.initialize()
                 self.assertEqual(initialized.protocolVersion, "2025-11-25")
                 tools = await client.list_tools()
-                self.assertEqual({t.name for t in tools.tools}, {"compile_reconstruction", "verify_certificate"})
-                schema = tools.tools[0].inputSchema["properties"]["problem_spec"]
+                self.assertTrue({"compile_reconstruction", "verify_reconstruction"} <= {t.name for t in tools.tools})
+                research = next(t for t in tools.tools if t.name == "compile_reconstruction")
+                schema = research.inputSchema["properties"]["problem_spec"]
                 Draft202012Validator.check_schema(schema)
                 self.assertEqual(schema["properties"]["mode"]["const"], "fixed_A_V_B")
                 prompt = await client.get_prompt("reconstruction_workflow")
@@ -74,7 +75,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(run["status"], expected)
                     self.assertTrue(verify_run(run)["certificate_verified"])
                     for cert in run["certificates"]:
-                        replay = await client.call_tool("verify_certificate", {"certificate": cert, "problem_spec": raw})
+                        replay = await client.call_tool("verify_reconstruction", {"certificate": cert, "problem_spec": raw})
                         self.assertTrue(replay.structuredContent["certificate_verified"])
                     bad = copy.deepcopy(run["certificates"][-1])
                     result = bad["result"]
@@ -92,7 +93,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                     else:
                         result["lift_witness"][0] = scalar(rational(result["lift_witness"][0]) + 1)
                     bad["certificate_sha256"] = digest({k: v for k, v in bad.items() if k != "certificate_sha256"})
-                    rejected = await client.call_tool("verify_certificate", {"certificate": bad, "problem_spec": raw})
+                    rejected = await client.call_tool("verify_reconstruction", {"certificate": bad, "problem_spec": raw})
                     self.assertFalse(rejected.isError)
                     self.assertFalse(rejected.structuredContent["certificate_verified"])
                     self.assertEqual(rejected.structuredContent["code"], "CERTIFICATE_WITNESS_INVALID")

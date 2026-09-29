@@ -145,3 +145,62 @@ Only observed problems belong here; this is not a claim of deployed AWS usage.
   HTTP for all five fixtures. The focused transport test passed without skips.
 - Suggestion: assert the specific failure code in adversarial integration checks,
   so a schema guard cannot accidentally stand in for mathematical replay.
+
+## 2026-09-29: MCP Apps card stayed at its initial height in a background pane
+
+- Attempted task: render the `ui://` certificate card in our own MCP Apps web host
+  (the simulated Alexa+ display), sized by the view's `ui/notifications/size-changed`.
+- Steps: host page → cross-origin sandbox proxy (`127.0.0.1` ↔ `localhost`) → inner
+  `srcdoc` iframe with injected CSP; the view measured `scrollHeight` after rendering.
+- Expected: the host receives the content height and grows the iframe.
+- Actual: when the browser pane was hidden (`visibilityState: hidden`), the nested
+  cross-origin frame reported height 0 or never reported. A second card created in the
+  hidden pane rendered (confirmed by a view log message) but was not painted in captures.
+- Severity: important for kiosk and smart-display hosts. No data or verification loss.
+- Workaround: the host passes a fixed `containerDimensions.height` (allowed by the spec),
+  the sandbox's inner frame fills it, and the view scrolls inside. Visual QA moved to a
+  headless Chrome instance driven through the DevTools protocol, which renders out-of-process frames.
+- Actionable suggestion: the MCP Apps spec or SDK could recommend fixed containers
+  for smart-display hosts and warn that size notifications depend on layout, which
+  hidden documents may skip.
+
+## 2026-09-29: A certified "no" needs its own status all the way to speech
+
+- Attempted task: voice a worksheet problem whose only solution is −12 tickets.
+- Steps: solve the rational system, then check the domain (whole numbers ≥ 0).
+- Expected: a clear spoken answer that is neither "error" nor a guess.
+- Actual: the first design folded domain failure into a generic rejection, so the
+  assistant could not say *why* the problem was impossible.
+- Severity: product-critical for trust.
+- Workaround: a separate claim `solve.no_solution_in_domain`. The certificate carries the
+  unique-solution derivations plus the violating unknown, and the view says "no valid
+  answer: the only exact solution gives −12 child tickets".
+- Actionable suggestion: tool-design guidance for Alexa+ skills should encourage
+  distinct, speakable negative outcomes instead of `isError` for findings.
+
+## 2026-09-29: The model-provider key is the only gate for a live agent demo
+
+- Attempted task: run the simulated Alexa+ agent loop end to end with a real model.
+- Steps: implemented Bedrock Converse (API-key bearer or SigV4), Claude via the official SDK,
+  and Gemini via its OpenAI-compatible endpoint; checked the environment for credentials.
+- Expected: at least one provider available for local testing.
+- Actual: no provider key is configured on the development machine, and the project budget is zero.
+  The agent loop is covered by a scripted provider over real MCP HTTP. Live provider
+  calls are not claimed.
+- Severity: important for the demo, not for correctness (math never passes through the model).
+- Workaround: Guided mode sends preset typed requests to the same MCP tools, labelled as involving
+  no AI interpretation.
+- Actionable suggestion: hackathon credits for Bedrock with a zero-card sandbox path
+  would let solo entrants demonstrate Nova-driven Alexa+ simulations.
+
+## 2026-09-29: Reference MCP Apps examples assume a CDN or a TypeScript dev server
+
+- Attempted task: build a view and a host that work offline under a strict CSP.
+- Steps: read the SEP-1865 spec (2026-01-26) and the ext-apps repository examples.
+- Expected: a dependency-free view client and a static sandbox proxy page.
+- Actual: the Python examples import the App SDK from unpkg inside the view. The reference
+  sandbox (`examples/basic-host`) takes its CSP from HTTP headers set by its TypeScript server.
+- Severity: nice-to-have for most hosts; important for strict-CSP or offline hosts.
+- Workaround: a roughly 60-line `postMessage` JSON-RPC client in the card, and a static sandbox
+  proxy that injects the CSP as a `<meta>` tag into the inner `srcdoc` frame.
+- Actionable suggestion: publish a no-CDN view client snippet and a static sandbox page.

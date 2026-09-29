@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Show Your Work · Simulated Alexa+</title>
+<link rel="stylesheet" href="/alexa.css">
+<script src="/alexa.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo" aria-hidden="true">✓</span><div><b>Show Your Work</b><small>Math answers an assistant can prove</small></div></div>
+  <div class="pills">
+    <span id="mcp-pill" class="pill">MCP · connecting…</span>
+    <span id="model-pill" class="pill">Model · …</span>
+    <span id="model-switch" class="switch" role="radiogroup" aria-label="Language model" hidden></span>
+  </div>
+</header>
+
+<main class="stage">
+  <section class="device-column">
+    <div class="device" id="device">
+      <div class="screen" id="screen">
+        <div class="statusbar"><span id="clock">--:--</span><span class="household" id="household">Rivera family · Maya</span><span class="skill">Show Your Work</span></div>
+        <div class="idle" id="idle">
+          <p class="greeting" id="greeting">Good evening</p>
+          <p class="prompt">Try “Alexa, check Maya’s homework.”</p>
+          <p class="sub">Answers appear only after an independent verifier replays the proof.</p>
+        </div>
+        <div class="conversation" id="conversation" hidden>
+          <p class="heard" id="heard"></p>
+          <p class="reply" id="reply"></p>
+        </div>
+        <div class="card-slot" id="card-slot" hidden></div>
+        <div class="lightbar" id="lightbar" aria-hidden="true"></div>
+      </div>
+    </div>
+    <form class="talk" id="talk" autocomplete="off">
+      <button type="button" id="mic" class="mic" aria-label="Hold to talk (or hold Space)" title="Hold to talk (or hold Space)"><span></span></button>
+      <input id="text" type="text" placeholder="Type what you’d say to Alexa…" aria-label="What you would say" maxlength="1000">
+      <button type="submit" class="send">Send</button>
+      <button type="button" id="mute" class="ghost" aria-pressed="false" title="Mute spoken replies">🔊</button>
+    </form>
+    <div class="guided">
+      <p id="mode-note" class="mode-note"></p>
+      <div id="scenarios" class="scenarios"></div>
+    </div>
+  </section>
+
+  <aside class="backstage" aria-label="Behind the screen">
+    <div class="backstage-head"><h2>Behind the screen</h2><button id="clear" class="ghost small">Clear</button></div>
+    <p class="explain">AI interprets → Compiler calculates → Verifier certifies. Every row below is a real call made in this session.</p>
+    <ol id="timeline" class="timeline" aria-live="polite"></ol>
+    <details class="server"><summary>MCP server &amp; tools</summary><div id="server-info" class="server-info"></div></details>
+  </aside>
+</main>
+<footer class="disclaimer">Simulated Alexa+ experience built for the Amazon Developer Hackathon. Not an Amazon product. Voice uses your browser’s speech features; math never touches the language model.</footer>
+</body>
+</html>

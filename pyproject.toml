@@ -4,20 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "algebraic-constraint-compiler"
-version = "0.2.0"
-description = "Exact reconstruction and second-order obstruction with independently replayable certificates"
+version = "0.3.0"
+description = "Show Your Work: math answers an assistant can prove. Exact certificates, independent verifier, MCP server with MCP Apps card, simulated Alexa+ host."
 requires-python = ">=3.9"
 license = {file = "LICENSE"}
 dependencies = []
 
 [project.optional-dependencies]
 mcp = ["mcp==1.30.0; python_version >= '3.10'"]
+claude = ["anthropic"]
 
 [project.scripts]
 acc = "algebraic_compiler.__main__:main"
+show-your-work-mcp = "algebraic_compiler.mcp_server:main"
+show-your-work-alexa = "algebraic_compiler.simulator:main"
 
 [tool.setuptools]
 packages = ["algebraic_compiler"]
 
 [tool.setuptools.package-data]
-algebraic_compiler = ["web/*.html", "web/*.css", "web/*.js"]
+algebraic_compiler = ["web/*.html", "web/*.css", "web/*.js", "web/alexa/*.html", "web/alexa/*.css", "web/alexa/*.js"]

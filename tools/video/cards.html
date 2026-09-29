@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Show Your Work · video cards</title>
+<style>
+:root{--bg:#070a10;--text:#eef2fb;--muted:#9aa6bf;--accent:#27d3ff;--accent2:#5b7cff;--ok:#3ccf91;--warn:#ffb14a;--line:#222b3d}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg)}
+.frame{position:relative;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:radial-gradient(1400px 800px at 25% -10%,#16264a 0%,var(--bg) 62%);color:var(--text);font:28px/1.4 ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
+section{position:absolute;inset:0;padding:120px 150px;display:none;flex-direction:column;justify-content:center}
+section.on{display:flex;animation:in .6s ease both}
+@keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.logo{width:92px;height:92px;border-radius:26px;display:grid;place-items:center;font-size:56px;font-weight:800;color:#061018;background:linear-gradient(135deg,var(--accent),var(--accent2));margin-bottom:34px}
+h1{font-size:112px;line-height:1.02;margin:0 0 22px;letter-spacing:-.035em}
+h2{font-size:72px;line-height:1.08;margin:0 0 28px;letter-spacing:-.025em}
+.sub{font-size:38px;color:var(--muted);margin:0}
+.thesis{font-size:44px;font-weight:650;margin-top:40px}
+.thesis span{color:var(--accent)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:20px}
+.stat{border:1px solid var(--line);border-radius:28px;padding:40px 44px;background:rgba(255,255,255,.03)}
+.stat b{display:block;font-size:120px;line-height:1;letter-spacing:-.04em;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;color:transparent}
+.stat p{margin:16px 0 0;font-size:34px}
+.stat small{display:block;margin-top:18px;color:var(--muted);font-size:22px}
+.question{margin-top:54px;font-size:56px;font-weight:700}
+.arch{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;margin-top:30px}
+.node{border:1px solid var(--line);border-radius:26px;padding:30px;background:rgba(255,255,255,.035);min-height:300px}
+.node .k{font-size:20px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.node h3{font-size:38px;margin:12px 0 12px;letter-spacing:-.01em}
+.node p{margin:0;color:var(--muted);font-size:25px}
+.node.ai .k{color:var(--warn)}.node.ver .k{color:var(--ok)}
+.flow{margin-top:30px;font-size:28px;color:var(--muted)}
+.flow b{color:var(--text)}
+.tags{display:flex;gap:14px;flex-wrap:wrap;margin-top:34px}
+.tags span{border:1px solid var(--line);border-radius:999px;padding:10px 20px;font-size:24px;color:#cfd7ea}
+.url{margin-top:44px;font-size:30px;color:var(--muted);font-family:ui-monospace,Menlo,monospace}
+.lower{position:absolute;left:0;right:0;bottom:0;padding:22px 150px;font-size:22px;color:var(--muted);border-top:1px solid var(--line);background:rgba(0,0,0,.25)}
+</style>
+</head>
+<body>
+<div class="frame" id="frame">
+<section id="title">
+  <div class="logo">✓</div>
+  <h1>Show Your Work</h1>
+  <p class="sub">Math answers Alexa+ can prove.</p>
+  <p class="thesis">AI <span>interprets</span>. Compiler <span>calculates</span>. Verifier <span>certifies</span>.</p>
+</section>
+<section id="why">
+  <h2>Kids already ask AI for math help.</h2>
+  <div class="stats">
+    <div class="stat"><b>~4 in 10</b><p>U.S. teens have used AI chatbots to solve math problems.</p><small>Pew Research Center, “How Teens Use and View AI”, Feb 2026 (survey Sept–Oct 2025, n = 1,458 teens)</small></div>
+    <div class="stat"><b>up to 65%</b><p>accuracy drop when one irrelevant clause is added to a math word problem.</p><small>Mirzadeh et al., “GSM-Symbolic”, Apple Machine Learning Research, 2024</small></div>
+  </div>
+  <p class="question">What if Alexa had to prove it?</p>
+</section>
+<section id="arch">
+  <h2>How it works</h2>
+  <div class="arch">
+    <div class="node ai"><div class="k">AI interprets</div><h3>Alexa+ agent</h3><p>Turns speech into typed equations and shows them back for a parent to check. It never calculates.</p></div>
+    <div class="node"><div class="k">MCP · 2025-11-25</div><h3>Show Your Work server</h3><p>Self-hosted, Streamable HTTP. 8 tools, 4 prompts, and an app-only forgery check.</p></div>
+    <div class="node"><div class="k">Compiler calculates</div><h3>Exact over ℚ</h3><p>No floats, no eval. Every answer carries a witness: a combination, a contradiction, or a counterexample.</p></div>
+    <div class="node ver"><div class="k">Verifier certifies</div><h3>Independent replay</h3><p>It never imports the compiler. It re-reads the text and checks by multiplying and adding.</p></div>
+  </div>
+  <p class="flow"><b>MCP Apps card</b> (SEP-1865) renders in any compliant host · <b>Family notebook</b> re-verified on every read · <b>Research tier</b>: same engine certifies algebraic deformation obstructions</p>
+  <div class="tags"><span>75 automated tests</span><span>real HTTP MCP</span><span>rehashed forgeries rejected</span><span>MIT licensed</span></div>
+</section>
+<section id="close">
+  <div class="logo">✓</div>
+  <h1>Show Your Work</h1>
+  <p class="thesis">AI <span>interprets</span>. Compiler <span>calculates</span>. Verifier <span>certifies</span>.</p>
+  <p class="url">github.com/Akari-H-111/algebraic-constraint-compiler</p>
+  <div class="lower">Simulated Alexa+ experience built for the Amazon Developer Hackathon. Not an Amazon product.</div>
+</section>
+</div>
+<script>
+function show(){ const id = location.hash.slice(1) || 'title'; document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === id)); }
+function fit(){ document.getElementById('frame').style.transform = 'scale(' + (innerWidth / 1920) + ')'; }
+window.addEventListener('hashchange', show); window.addEventListener('resize', fit); fit(); show();
+</script>
+</body>
+</html>

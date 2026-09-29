@@ -1,0 +1,13 @@
+# Render Blueprint: free web service running the Show Your Work MCP server from the Dockerfile.
+# Set ACC_ALLOWED_HOSTS to your service host (e.g. show-your-work-mcp.onrender.com) to enable
+# Host/Origin checks; without it the public server disables DNS-rebinding protection.
+services:
+  - type: web
+    name: show-your-work-mcp
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: ACC_ALLOWED_HOSTS
+        sync: false

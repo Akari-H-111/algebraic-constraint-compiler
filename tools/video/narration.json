@@ -1,0 +1,14 @@
+{
+  "voice_note": "Narration text per recorded scene. Audio files, when supplied, live in <frames>/narration/<scene>.wav.",
+  "scenes": {
+    "01-title": "",
+    "02-why": "Half of U.S. teens now use AI chatbots for schoolwork, and about four in ten use them for math. But language models are fluent, not exact, and a parent can't tell a confident wrong answer from a right one. So we asked: what if Alexa had to prove it?",
+    "03-homework": "This is Show Your Work, on a simulated Alexa+ display. Maya solved 3x plus 5 equals 20 and got 25 over 3. Alexa doesn't guess. It sends her lines of work to our MCP server, which finds the exact step that changes the answer: x equals 5 satisfies line one, but not line two. An independent verifier replays that proof before Alexa says a word. Maya gets a hint, not the answer.",
+    "04-translation": "The only AI step is turning words into equations, and the screen shows that translation back so a parent can check it. Everything after is exact rational arithmetic, with no floating point and no model in the loop.",
+    "05-typo": "Some homework can't be right as written. Twenty tickets for three hundred dollars forces minus twelve child tickets, so the worksheet has a typo. That's a certified no, with a two-line proof.",
+    "06-forgery": "Every card is an MCP App. Replay re-checks the proof live. Try a forgery changes one number and recomputes the hash, and the verifier still rejects it. A valid fingerprint can't make a false proof true.",
+    "07-memory": "Alexa can make a practice problem whose answer key is verified before anyone sees it, and it remembers across sessions. The weekly report re-verifies every saved certificate before counting it, and names Maya's most common slip.",
+    "08-architecture": "Under the hood: a self-hosted MCP server over Streamable HTTP, an interactive MCP Apps card that works in any compliant host, and a verifier that never imports the compiler. The same engine certifies research-level algebra too.",
+    "09-close": "AI interprets. Compiler calculates. Verifier certifies."
+  }
+}
