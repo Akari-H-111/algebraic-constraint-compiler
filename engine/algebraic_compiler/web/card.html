@@ -217,7 +217,7 @@ pre{font-family:var(--mono);font-size:.72em;max-height:220px;overflow:auto;backg
   async function start(){
     if (!inHost) { showEmpty('This is an MCP Apps view. Open it inside an MCP Apps host (Claude, ChatGPT, VS Code, Goose, or the Show Your Work Alexa+ simulator).'); return; }
     try {
-      const init = await request('ui/initialize', {appInfo:{name:'show-your-work-card', version:'0.3.1'},
+      const init = await request('ui/initialize', {appInfo:{name:'show-your-work-card', version:'0.3.2'},
         appCapabilities:{availableDisplayModes:['inline']}, protocolVersion:'2026-01-26'});
       applyContext((init && init.hostContext) || {});
       notify('ui/notifications/initialized', {});
