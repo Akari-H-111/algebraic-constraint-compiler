@@ -164,7 +164,7 @@ class Host:
                 with self.lock:
                     messages.clear()
                 return {"reply": "Sorry, my language model isn't reachable right now.", "events": events, "card": holder.get("card")}
-            events.append({"type": "model", "provider": provider.name, "model": provider.model,
+            events.append({"type": "model", "provider": provider.name, "model": getattr(provider, "last_model", provider.model),
                            "ms": round((time.monotonic() - started) * 1000), "tool_calls": [c.name for c in calls]})
             if not calls:
                 break
@@ -172,6 +172,12 @@ class Host:
             provider.tool_results(messages, results)
         else:
             reply = reply or "I ran out of steps on that one."
+        if not reply.strip() and holder.get("card"):
+            # The model called a tool but said nothing: speak the tool's verified suggested speech instead.
+            payload = holder["card"]["result"].get("structuredContent") or {}
+            reply = (payload.get("view") or {}).get("spoken") or ""
+            events.append({"type": "reply", "text": reply, "source": "verified suggested speech (model reply was empty)"})
+            return {"reply": reply, "events": events, "card": holder.get("card")}
         events.append({"type": "reply", "text": reply})
         return {"reply": reply, "events": events, "card": holder.get("card")}
 

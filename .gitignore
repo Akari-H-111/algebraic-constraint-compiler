@@ -12,3 +12,4 @@ build/
 dist/
 
 .devpost-hackathon-state.json
+*.env

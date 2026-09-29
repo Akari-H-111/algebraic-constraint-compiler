@@ -4,20 +4,20 @@
     "01-title": "",
     "02-why": "Half of U.S. teens use AI chatbots for schoolwork, and about four in ten use them for math. But language models are fluent, not exact, and a parent can't tell a confident wrong answer from a right one. So what if Alexa had to prove it?",
     "03-homework": {
-      "pre": "Maya got 25 over 3 for 3x plus 5 equals 20. Her dad asks Alexa, running Claude.",
-      "post": "Claude doesn't do the math. It sends Maya's lines to our MCP server, which finds the exact step that changes the answer: x equals 5 works before the step, but not after. An independent verifier replays that proof before Alexa says a word, and Maya gets a hint, not the answer."
+      "pre": "Maya got 25 over 3 for 3x plus 5 equals 20. Her dad asks Alexa. Here, the agent runs on Gemini.",
+      "post": "Gemini doesn't do the math. It sends Maya's lines to our MCP server, which finds the exact step that changes the answer: x equals 5 works before the step, but not after. An independent verifier replays that proof before Alexa says a word, and Maya gets a hint, not the answer."
     },
     "04-translation": "The only AI step is turning words into equations, and the screen shows that translation back, for a parent to check. Everything after is exact rational arithmetic, with no floating point and no model in the loop.",
     "05-typo": {
-      "pre": "Now switch the model to Gemini, and try a worksheet problem.",
-      "post": "Twenty tickets for three hundred dollars forces minus twelve child tickets, so the worksheet has a typo. A different model, the same tools, and a certified no, with a two-line proof."
+      "pre": "Now, a worksheet problem.",
+      "post": "Twenty tickets for three hundred dollars forces minus twelve child tickets, so the worksheet has a typo. That's a certified no, with a two-line proof."
     },
     "06-forgery": "Every card is an MCP App. Replay re-checks the proof live. Try a forgery changes one number and recomputes the hash, and the verifier still rejects it. A valid fingerprint can't make a false proof true.",
     "07-memory": {
       "pre": "Alexa also checks answers, makes practice problems with verified answer keys, and remembers progress across sessions.",
       "post": "Every saved certificate is re-verified before it's counted."
     },
-    "08-architecture": "Under the hood: a self-hosted MCP server over Streamable HTTP, an MCP Apps card that works in any compliant host, and a verifier that never imports the compiler. Try it in your browser, or run it with Claude or Gemini.",
+    "08-architecture": "Under the hood: a self-hosted MCP server over Streamable HTTP, an MCP Apps card for any compliant host, and a verifier that never imports the compiler. Try it in your browser today.",
     "09-close": "AI interprets. Compiler calculates. Verifier certifies."
   }
 }

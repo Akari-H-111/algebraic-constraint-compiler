@@ -108,7 +108,7 @@
         detail.append(code, verdict);
       }
     }
-    else if (ev.type === 'reply') { add(ev.guided ? 'speech' : 'AI explains', ev.guided ? 'Verified suggested speech' : 'Spoken reply'); detail.textContent = ev.text; }
+    else if (ev.type === 'reply') { add(ev.guided || ev.source ? 'speech' : 'AI explains', ev.guided ? 'Verified suggested speech' : ev.source ? 'Verified suggested speech (model said nothing)' : 'Spoken reply'); detail.textContent = ev.text; }
     else if (ev.type === 'app') { add('card → host', ev.name); detail.textContent = ev.text; }
     else { add('notice', ''); detail.className += ' error'; detail.textContent = ev.text; }
     if (ev.ms != null) kind.append(el('span', 'ms', ev.ms + ' ms'));

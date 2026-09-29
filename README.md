@@ -10,6 +10,9 @@ written, and remembers each learner's progress across sessions. Every result
 comes with a portable certificate that anyone can re-check without trusting
 the assistant.
 
+**Public MCP endpoint (Streamable HTTP, 2025-11-25):** `https://show-your-work-mcp.onrender.com/mcp`
+(free instance: the first request may take about 50 seconds while it wakes up).
+
 **Try it now, no install:** [akari-h-111.github.io/algebraic-constraint-compiler](https://akari-h-111.github.io/algebraic-constraint-compiler/).
 The web demo runs the real Python compiler and verifier in your browser (Guided requests, no AI). For voice, the
 Claude or Gemini agent and the MCP server, run it locally (below).
@@ -148,7 +151,7 @@ Prompts: `homework_helper`, `word_problem`, `weekly_progress`, `reconstruction_w
 ## Evidence
 
 ```bash
-.venv/bin/python -B -m unittest discover -s tests -p 'test*.py' -v   # 75 tests
+.venv/bin/python -B -m unittest discover -s tests -p 'test*.py' -v   # 76 tests
 python3 -B -m unittest discover -s tests -p 'test*.py'               # core on Python 3.9 (HTTP tests skip)
 ```
 
@@ -182,8 +185,10 @@ Show Your Work passes its SEP-1865 lint with 0 errors and 0 warnings.
   Amazon product, and no Alexa account is connected. It uses the browser's
   speech recognition and synthesis. Math never passes through the language
   model.
-- The agent loop is tested with a scripted provider. Live Bedrock, Claude
-  and Gemini calls need your own key.
+- The agent loop is tested with scripted providers, and live with Gemini
+  (the demo video). Live Claude and Bedrock calls need your own key and credit.
+  If a model fails, the device says so. If it calls a tool but stays silent,
+  the device speaks the tool's verified suggested speech.
 - The notebook is a local SQLite file. Hosted containers keep it only
   per instance.
 - Certificates are replayable computational records, not proof-assistant

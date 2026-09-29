@@ -204,3 +204,29 @@ Only observed problems belong here; this is not a claim of deployed AWS usage.
 - Workaround: a roughly 60-line `postMessage` JSON-RPC client in the card, and a static sandbox
   proxy that injects the CSP as a `<meta>` tag into the inner `srcdoc` frame.
 - Actionable suggestion: publish a no-CDN view client snippet and a static sandbox page.
+
+## 2026-09-29: Free-tier model capacity shaped the live agent demo
+
+- Attempted task: record the simulated Alexa+ agent live with Gemini (gemini-2.5-flash).
+- Steps: real agent loop over MCP; several turns per scene; narration with Gemini TTS.
+- Expected result: steady responses within a few seconds.
+- Actual result: intermittent HTTP 503 ("model is currently experiencing high demand"). Free-tier daily
+  per-model caps were reached during recording: 20 per day for gemini-2.5-flash, 10 per day per TTS model.
+  The fallback model answered once with a tool call but an empty spoken reply.
+- Severity: important for demos; no effect on correctness (math never passes through the model).
+- Workaround: retries with short backoff, a fallback model list, and speaking the tool's verified
+  suggested speech when the model says nothing (tested). The recorder retries failed turns and
+  jump-cuts model latency in the edit while the on-screen timeline keeps the real milliseconds.
+- Actionable suggestion: hackathon model credits, or a documented free "demo" tier with higher daily
+  limits, would let solo entrants record live agent demos reliably.
+
+## 2026-09-29: A newer TTS model spoke its style instructions
+
+- Attempted task: narrate the demo with a newer Gemini TTS model using a style prefix
+  ("Read this as a calm narrator: ...").
+- Expected result: the prefix sets the tone and is not spoken.
+- Actual result: the loudness envelope showed about 10 extra seconds of speech per clip. The earlier
+  TTS model (gemini-3.1-flash-tts-preview) had honoured the same prefix.
+- Severity: nice-to-have; caught before publishing by measuring clip lengths and envelopes.
+- Workaround: kept the earlier model for narration and verified transcripts with a separate model.
+- Actionable suggestion: document per-model support for style prompts, or offer a separate style field.

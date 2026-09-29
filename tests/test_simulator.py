@@ -179,6 +179,21 @@ class SimulatorHTTPTests(unittest.TestCase):
         status, turn = self.request("/api/turn", {"session": "t", "text": "hello"})
         self.assertIn("No AI model is configured", turn["reply"])
 
+    def test_silent_model_falls_back_to_verified_suggested_speech(self):
+        class Silent(ScriptedProvider):
+            def complete(self, system, tools, messages):
+                self.calls += 1
+                if self.calls == 1:
+                    return "", [Call("c1", "solve_equations", {"equations": ["x + y = 10", "x - y = 2"]})]
+                return "", []
+        self.host.providers, self.host.default = {"silent": Silent()}, "silent"
+        try:
+            result = self.host.turn("silent-test", "solve x + y = 10 and x - y = 2")
+        finally:
+            self.host.providers, self.host.default = {}, None
+        self.assertEqual(result["reply"], "The answer is x = 6 and y = 4. I checked it independently, and it's the only solution.")
+        self.assertIn("verified suggested speech", result["events"][-1]["source"])
+
     def test_scripted_agent_loop_calls_mcp_and_returns_card(self):
         self.host.providers, self.host.default = {"scripted": ScriptedProvider()}, "scripted"
         try:

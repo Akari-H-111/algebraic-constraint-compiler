@@ -85,13 +85,16 @@ async function cardEval(expression) {
 async function goto(url) { await send('Page.navigate', { url }); await sleep(900); }
 
 // ---------- recording ----------
-let recording = null;
-async function capture(dir, seconds, actions) {
+// Each scene records at least `minSeconds`, keeps recording until its actions finish,
+// then `tail` more seconds, so slow model replies are never cut off.
+let sceneStart = 0, speech = [];
+async function capture(dir, minSeconds, actions, tail = 2.5) {
   mkdirSync(dir, { recursive: true });
-  let index = 0, stop = false;
-  const started = Date.now(), total = Math.round(seconds * FPS);
+  let index = 0, done = !actions, doneAt = Date.now();
+  const started = Date.now(); sceneStart = started;
   const loop = (async () => {
-    while (!stop && index < total) {
+    for (;;) {
+      if (done && index >= minSeconds * FPS && Date.now() - doneAt >= tail * 1000) break;
       const due = started + index * (1000 / FPS);
       const now = Date.now(); if (due > now) await sleep(due - now);
       const { data } = await send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
@@ -99,8 +102,8 @@ async function capture(dir, seconds, actions) {
       index++;
     }
   })();
-  if (actions) await actions();
-  await loop; stop = true;
+  if (actions) { await actions(); done = true; doneAt = Date.now(); }
+  await loop;
   return index / FPS;
 }
 async function typeInto(text, cps = 32) {
@@ -110,11 +113,31 @@ async function typeInto(text, cps = 32) {
     await sleep(2000 / cps);
   }
 }
-async function ask(scenario, utterance) {
-  await typeInto(utterance);
-  await sleep(250);
-  if (MODE === 'agent') await evaluate(`document.querySelector('#talk').requestSubmit()`);
-  else await evaluate(`document.querySelector('#text').value = ''; window.__syw.guided(${JSON.stringify(scenario)})`);
+let cuts = [];
+async function ask(scenario, utterance, { provider, voice = true } = {}) {
+  if (MODE === 'agent' && provider) { await evaluate(`window.__syw.setProvider(${JSON.stringify(provider)})`); await sleep(900); }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await typeInto(utterance);
+    await sleep(250);
+    const submitted = (Date.now() - sceneStart) / 1000;
+    if (MODE === 'agent') await evaluate(`document.querySelector('#talk').requestSubmit()`);
+    else await evaluate(`document.querySelector('#text').value = ''; window.__syw.guided(${JSON.stringify(scenario)})`);
+    await sleep(300);
+    await waitIdle(120000);
+    const replied = (Date.now() - sceneStart) / 1000;
+    const text = await evaluate(`document.querySelector('#reply').textContent`);
+    if (MODE === 'agent' && /isn't reachable|Something went wrong/.test(text)) {
+      cuts.push([submitted - 3.5, replied + 0.5]);  // drop the failed attempt from the edit entirely
+      console.log(`  model unavailable on attempt ${attempt + 1}; retrying`);
+      await sleep(4000 * (attempt + 1));
+      continue;
+    }
+    // Model latency beyond ~2 s becomes a jump cut in the edit; the timeline keeps the real milliseconds.
+    if (replied - submitted > 3.5) cuts.push([submitted + 1.6, replied - 0.9]);
+    if (voice && text) speech.push({ t: replied, text, provider: provider || null });
+    return;
+  }
+  throw new Error('Model unavailable after 3 attempts: ' + scenario);
 }
 async function emphasize(selectorIndex) {
   await cardEval(`(() => { const s = document.createElement('style'); s.textContent = '@keyframes syw{50%{box-shadow:0 0 0 4px rgba(39,211,255,.55)}} .syw-em{animation:syw 1.2s ease-in-out 3;border-color:rgba(39,211,255,.8)!important}'; document.head.append(s);
@@ -129,44 +152,47 @@ const utter = {
   practice: 'Alexa, give Maya a practice problem like that one.',
   progress: 'Alexa, how is Maya doing with math this week?',
 };
-const waitIdle = async (limit = 20000) => { const t = Date.now(); while (Date.now() - t < limit) { if (!(await evaluate('window.__syw.state.busy'))) return; await sleep(150); } };
+async function waitIdle(limit = 20000) { const t = Date.now(); while (Date.now() - t < limit) { if (!(await evaluate('window.__syw.state.busy'))) return; await sleep(150); } }
 
 const scenes = [];
 async function scene(name, seconds, actions) {
+  speech = []; cuts = [];
   const measured = await capture(join(OUT, name), seconds, actions);
-  scenes.push({ name, seconds: measured });
-  console.log(`scene ${name}: ${measured.toFixed(1)}s`);
+  scenes.push({ name, seconds: measured, speech, cuts });
+  console.log(`scene ${name}: ${measured.toFixed(1)}s` + speech.map(x => ` | @${x.t.toFixed(1)}s ${x.text.slice(0, 60)}`).join(''));
 }
 
 mkdirSync(OUT, { recursive: true });
 await goto(CARDS + '#title');
-await scene('01-title', 4.5);
+await scene('01-title', 3);
 await evaluate(`location.hash = 'why'`);
-await scene('02-why', 12.5);
+await scene('02-why', 8);
 
 await goto(SIM + '/');
 await evaluate(`document.querySelector('#mute').click(); document.querySelector('#clear').click(); true`);
-await scene('03-homework', 38, async () => {
-  await sleep(1200); await ask('work', utter.work); await waitIdle(); await sleep(800);
+// DEMO_MODELS=gemini records every agent turn with Gemini (for example when no Claude credit is available).
+const CLAUDE = { provider: process.env.DEMO_MODELS === 'gemini' ? 'gemini' : 'anthropic' }, GEMINI = { provider: 'gemini' };
+await scene('03-homework', 12, async () => {
+  await sleep(900); await ask('work', utter.work, CLAUDE);
 });
-await scene('04-translation', 23, async () => {
-  await sleep(1500); await emphasize(0); await sleep(9000); await emphasize(1);
+await scene('04-translation', 15, async () => {
+  await sleep(1500); await emphasize(0); await sleep(8000); await emphasize(1);
 });
-await scene('05-typo', 22, async () => {
-  await sleep(600); await ask('tickets', utter.tickets); await waitIdle();
+await scene('05-typo', 10, async () => {
+  await sleep(500); await ask('tickets', utter.tickets, GEMINI);
 });
-await scene('06-forgery', 22, async () => {
-  await sleep(2500); await clickCard('Replay verifier'); await sleep(6500); await clickCard('Try a forgery');
+await scene('06-forgery', 15, async () => {
+  await sleep(2500); await clickCard('Replay verifier'); await sleep(5500); await clickCard('Try a forgery');
 });
-await scene('07-memory', 23, async () => {
-  await sleep(300); await ask('answer', utter.answer); await waitIdle(); await sleep(2600);
-  await ask('practice', utter.practice); await waitIdle(); await sleep(2600);
-  await ask('progress', utter.progress); await waitIdle();
+await scene('07-memory', 12, async () => {
+  await sleep(300); await ask('answer', utter.answer, { ...CLAUDE, voice: false }); await sleep(1500);
+  await ask('practice', utter.practice, CLAUDE); await sleep(1200);
+  await ask('progress', utter.progress, CLAUDE);
 });
 await goto(CARDS + '#arch');
-await scene('08-architecture', 14.5);
+await scene('08-architecture', 8);
 await evaluate(`location.hash = 'close'`);
-await scene('09-close', 6);
+await scene('09-close', 4);
 
 writeFileSync(join(OUT, 'scenes.json'), JSON.stringify({ fps: FPS, mode: MODE, scenes }, null, 1));
 ws.close(); chrome.kill('SIGTERM'); await sleep(300);

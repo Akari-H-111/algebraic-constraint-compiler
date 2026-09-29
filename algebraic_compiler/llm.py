@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,18 +26,27 @@ class ProviderError(RuntimeError):
     pass
 
 
-def _http_json(url, body, headers, timeout=60):
+class Overloaded(ProviderError):
+    """HTTP 429/503 after retries: the caller may try a fallback model."""
+
+
+def _http_json(url, body, headers, timeout=60, retries=2):
     data = json.dumps(body).encode("utf-8")
-    request = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json", **headers},
-                                     method="POST")
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read()[:500].decode("utf-8", errors="replace")
-        raise ProviderError(f"Model API HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise ProviderError(f"Model API unreachable: {exc.reason}") from exc
+    for attempt in range(retries + 1):
+        request = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json", **headers},
+                                         method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read()[:500].decode("utf-8", errors="replace")
+            if exc.code in (429, 500, 503) and attempt < retries:
+                time.sleep(0.8 * (2 ** attempt))
+                continue
+            kind = Overloaded if exc.code in (429, 503) else ProviderError
+            raise kind(f"Model API HTTP {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise ProviderError(f"Model API unreachable: {exc.reason}") from exc
 
 
 def simplify_schema(schema):
@@ -75,15 +85,28 @@ class _Provider:
 
 
 class OpenAICompatible(_Provider):
-    def __init__(self, name, base_url, api_key, model):
+    def __init__(self, name, base_url, api_key, model, fallbacks=()):
         self.name, self.base_url, self.api_key, self.model = name, base_url.rstrip("/"), api_key, model
+        self.fallbacks = [m for m in fallbacks if m and m != model]
 
     def complete(self, system, tools, messages):
-        body = {"model": self.model, "messages": [{"role": "system", "content": system}] + messages,
-                "tools": [{"type": "function", "function": {"name": t["name"], "description": t.get("description", ""),
-                                                            "parameters": simplify_schema(t["inputSchema"])}}
-                          for t in tools],
-                "tool_choice": "auto", "temperature": 0.2}
+        # When the primary model is overloaded, try fallbacks; `model` reports the one that answered.
+        for index, model in enumerate([self.model] + self.fallbacks):
+            try:
+                result = self._complete(model, system, tools, messages)
+                self.last_model = model
+                return result
+            except Overloaded:
+                if index == len(self.fallbacks):
+                    raise
+
+    def _complete(self, model, system, tools, messages):
+        body = {"model": model, "messages": [{"role": "system", "content": system}] + messages, "temperature": 0.2}
+        if tools:
+            body["tools"] = [{"type": "function", "function": {"name": t["name"], "description": t.get("description", ""),
+                                                               "parameters": simplify_schema(t["inputSchema"])}}
+                             for t in tools]
+            body["tool_choice"] = "auto"
         data = _http_json(self.base_url + "/chat/completions", body, {"Authorization": "Bearer " + self.api_key})
         message = data["choices"][0]["message"]
         assistant = {"role": "assistant", "content": message.get("content") or ""}
@@ -239,8 +262,9 @@ def build(choice, model=None):
         key = os.environ.get("GEMINI_API_KEY")
         if not key:
             raise ProviderError("Set GEMINI_API_KEY")
+        fallbacks = os.environ.get("SYW_GEMINI_FALLBACKS", "gemini-2.5-flash-lite,gemini-3.5-flash").split(",")
         return OpenAICompatible("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", key,
-                                model or os.environ.get("SYW_GEMINI_MODEL", "gemini-2.5-flash"))
+                                model or os.environ.get("SYW_GEMINI_MODEL", "gemini-2.5-flash"), fallbacks)
     if choice == "openai":
         key = os.environ.get("OPENAI_API_KEY")
         if not key:
