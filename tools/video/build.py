@@ -68,6 +68,7 @@ def main():
     shutil.rmtree(work, ignore_errors=True)
     work.mkdir()
     clips, srt, audio_inputs, t = [], [], [], 0.0
+    chapters = []
     for number, scene in enumerate(meta["scenes"]):
         name, recorded = scene["name"], scene["seconds"]
         if number == 0 and args.first:
@@ -106,6 +107,7 @@ def main():
         run([ff, "-y", "-loglevel", "error", "-framerate", fps, "-i", frames / name / "%05d.jpg",
              "-t", f"{length:.3f}", "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-r", "30", clip_path])
         clips.append(clip_path)
+        chapters.append((t, name))
         for start, audio, caption in placed:
             span = spoken(audio) if audio else (seconds - 1.0)
             if audio:
@@ -147,6 +149,9 @@ def main():
     cmd += ["-t", f"{t:.3f}"]
     cmd += ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", out]
     run(cmd)
+    titles = json.loads((ROOT / "tools/video" / os.environ.get("NARRATION", "narration.json")).read_text()).get("chapters", {})
+    lines = [f"{int(a // 60)}:{int(a % 60):02d} {titles[n]}" for a, n in chapters if n in titles]
+    out.with_suffix(".chapters.txt").write_text("\n".join(lines) + "\n")
     print(f"{out} ({t:.1f}s), captions {captions}")
 
 

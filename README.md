@@ -10,6 +10,8 @@ written, and remembers each learner's progress across sessions. Every result
 comes with a portable certificate that anyone can re-check without trusting
 the assistant.
 
+**Demo video (2:54):** https://youtu.be/MAS9ZeFuNRg
+
 **Public MCP endpoint (Streamable HTTP, 2025-11-25):** `https://show-your-work-mcp.onrender.com/mcp`
 (free instance: the first request may take about 50 seconds while it wakes up).
 

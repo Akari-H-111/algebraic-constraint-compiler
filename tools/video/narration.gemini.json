@@ -19,5 +19,14 @@
     },
     "08-architecture": "Under the hood: a self-hosted MCP server over Streamable HTTP, an MCP Apps card for any compliant host, and a verifier that never imports the compiler. Try it in your browser today.",
     "09-close": "AI interprets. Compiler calculates. Verifier certifies."
+  },
+  "chapters": {
+    "01-title": "Show Your Work",
+    "03-homework": "Checking Maya's homework (Gemini agent → MCP)",
+    "04-translation": "The only AI step: translation",
+    "05-typo": "A worksheet with a typo: certified no",
+    "06-forgery": "MCP Apps card: replay and forgery test",
+    "07-memory": "Practice and progress across sessions",
+    "08-architecture": "How it works"
   }
 }
