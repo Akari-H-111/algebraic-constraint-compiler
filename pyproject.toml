@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "algebraic-constraint-compiler"
-version = "0.3.3"
+version = "0.3.4"
 description = "Show Your Work: math answers an assistant can prove. Exact certificates, independent verifier, MCP server with MCP Apps card, simulated Alexa+ host."
 requires-python = ">=3.9"
 license = {file = "LICENSE"}

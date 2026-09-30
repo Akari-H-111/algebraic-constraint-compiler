@@ -1,4 +1,23 @@
-# Show Your Work: math answers Alexa+ can prove
+<p align="center">
+  <img src="docs/images/banner.png" alt="Show Your Work: math answers Alexa+ can prove. AI interprets, compiler calculates, verifier certifies." width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/Akari-H-111/algebraic-constraint-compiler/actions/workflows/ci.yml"><img src="https://github.com/Akari-H-111/algebraic-constraint-compiler/actions/workflows/ci.yml/badge.svg" alt="Checks"></a>
+  <img src="https://img.shields.io/badge/MCP-2025--11--25-27d3ff" alt="MCP 2025-11-25">
+  <img src="https://img.shields.io/badge/MCP%20Apps-SEP--1865-5b7cff" alt="MCP Apps SEP-1865">
+  <img src="https://img.shields.io/badge/python-3.9%2B%20core%20%C2%B7%203.10%2B%20MCP-3776ab" alt="Python">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/MAS9ZeFuNRg"><b>▶ Demo video (2:54)</b></a> ·
+  <a href="https://akari-h-111.github.io/algebraic-constraint-compiler/"><b>Try it in your browser</b></a> ·
+  <a href="#use-it-from-any-mcp-host"><b>Public MCP endpoint</b></a> ·
+  <a href="https://devpost.com/software/algebraic-constraint-compiler"><b>Devpost</b></a>
+</p>
+
+# Show Your Work
 
 **AI interprets. Compiler calculates. Verifier certifies.**
 
@@ -10,14 +29,11 @@ written, and remembers each learner's progress across sessions. Every result
 comes with a portable certificate that anyone can re-check without trusting
 the assistant.
 
-**Demo video (2:54):** https://youtu.be/MAS9ZeFuNRg
-
-**Public MCP endpoint (Streamable HTTP, 2025-11-25):** `https://show-your-work-mcp.onrender.com/mcp`
-(free instance: the first request may take about 50 seconds while it wakes up).
-
-**Try it now, no install:** [akari-h-111.github.io/algebraic-constraint-compiler](https://akari-h-111.github.io/algebraic-constraint-compiler/).
-The web demo runs the real Python compiler and verifier in your browser (Guided requests, no AI). For voice, the
-Claude or Gemini agent and the MCP server, run it locally (below).
+> [!TIP]
+> **No install needed:** the [web demo](https://akari-h-111.github.io/algebraic-constraint-compiler/) runs the real
+> Python compiler and verifier in your browser (Guided requests, no AI). Point any MCP client at the public
+> endpoint `https://show-your-work-mcp.onrender.com/mcp` (free instance: the first request can take about
+> 50 seconds to wake it). For voice and the Claude or Gemini agent, [run it locally](#try-it-in-two-minutes).
 
 ![Simulated Alexa+ display checking a child's homework: the mistake is on line 1 → 2, with the typed equations, a hint, the proof, and a verified certificate](docs/images/homework-check.png)
 
@@ -58,10 +74,15 @@ verifier still rejects it.
 
 ## How it works
 
+![How it works: the Alexa+ agent interprets, the MCP server routes, the exact compiler calculates, and an independent verifier replays every certificate](docs/images/architecture.png)
+
+<details>
+<summary>Data flow (text diagram)</summary>
+
 ```mermaid
-flowchart LR
-  V["Voice or text<br/>(Alexa+ style display)"] --> A["Agent<br/>AI interprets"]
-  A -- "MCP tools/call<br/>Streamable HTTP 2025-11-25" --> S["Show Your Work<br/>MCP server"]
+flowchart TB
+  V["Voice or text<br/>(Alexa+ style display)"] --> A["Agent: AI interprets"]
+  A -- "MCP tools/call · Streamable HTTP 2025-11-25" --> S["Show Your Work MCP server"]
   S --> C["Exact compiler<br/>rationals, no floats"]
   C --> K["Certificate<br/>witness + SHA-256"]
   K --> R["Independent verifier<br/>re-reads the text, multiplies and adds"]
@@ -69,6 +90,8 @@ flowchart LR
   S -- "ui:// MCP App card" --> V
   S <--> N[("Family notebook<br/>re-verified on every read")]
 ```
+
+</details>
 
 - **The only AI step is translating words into equations**, and the card
   shows that translation back ("What I understood — please check").
@@ -117,6 +140,11 @@ live. The certificate for the same typed model doesn't change, because neither
 model calculates.
 
 ### Use it from any MCP host
+
+**Hosted:** `https://show-your-work-mcp.onrender.com/mcp` (Streamable HTTP, protocol 2025-11-25, no auth,
+stateless). It's a free instance, so the first request may take about 50 seconds while it wakes up.
+
+**Local:**
 
 ```bash
 .venv/bin/python -m algebraic_compiler.mcp_server              # http://127.0.0.1:8000/mcp
