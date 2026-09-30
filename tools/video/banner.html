@@ -25,6 +25,7 @@ h1{font-size:60px;line-height:1;margin:0;letter-spacing:-.035em}
 .shot img{position:absolute;display:block;width:1056px;left:-141px;top:-48px}
 .badge{position:absolute;right:52px;top:18px;font-size:14px;color:var(--warn);border:1px solid rgba(255,177,74,.45);
   border-radius:999px;padding:5px 12px;background:rgba(255,177,74,.1);z-index:2}
+.social .frame{height:640px}.social .left{top:170px}.social .shot{top:164px}.social .badge{top:138px}
 </style>
 </head>
 <body>
@@ -39,6 +40,7 @@ h1{font-size:60px;line-height:1;margin:0;letter-spacing:-.035em}
   <div class="shot"><img src="../../docs/images/homework-check.png" alt=""></div>
 </div>
 <script>
+if (location.hash === '#social') document.body.classList.add('social');
 function fit(){ document.getElementById('frame').style.transform = 'scale(' + (innerWidth / 1280) + ')'; }
 addEventListener('resize', fit); fit();
 </script>
