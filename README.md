@@ -4,10 +4,10 @@
 
 <p align="center">
   <a href="https://github.com/Akari-H-111/algebraic-constraint-compiler/actions/workflows/ci.yml"><img src="https://github.com/Akari-H-111/algebraic-constraint-compiler/actions/workflows/ci.yml/badge.svg" alt="Checks"></a>
-  <img src="https://img.shields.io/badge/MCP-2025--11--25-27d3ff" alt="MCP 2025-11-25">
-  <img src="https://img.shields.io/badge/MCP%20Apps-SEP--1865-5b7cff" alt="MCP Apps SEP-1865">
+  <img src="https://img.shields.io/badge/MCP-2025--11--25-0a6b86" alt="MCP 2025-11-25">
+  <img src="https://img.shields.io/badge/MCP%20Apps-SEP--1865-3948b8" alt="MCP Apps SEP-1865">
   <img src="https://img.shields.io/badge/python-3.9%2B%20core%20%C2%B7%203.10%2B%20MCP-3776ab" alt="Python">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1a7f37" alt="MIT license"></a>
 </p>
 
 <p align="center">
@@ -19,23 +19,23 @@
 
 # Show Your Work
 
-**AI interprets. Compiler calculates. Verifier certifies.**
+Show Your Work is an MCP server plus a **simulated** Alexa+ smart display (not an
+Amazon product). It checks a child's math homework and never says "correct"
+unless an independent verifier has replayed an exact proof.
 
-Show Your Work is an MCP server and a simulated Alexa+ smart-display experience.
-It checks a child's math homework and never says "correct" unless an
-independent verifier has replayed an exact proof. It finds the exact line of
-work where the mistake happened, catches word problems that can't be true as
-written, and remembers each learner's progress across sessions. Every result
-comes with a portable certificate that anyone can re-check without trusting
-the assistant.
+- **It finds the exact line** where the work goes wrong, with a counterexample you can check by hand.
+- **It says "no" and "not sure" honestly:** word problems that can't be true as written are
+  certified impossible, and a line that is ambiguous or doesn't parse as an equation is held for
+  review instead of guessed. (It does no handwriting recognition: the host model reads the page.)
+- **Every result is a portable certificate** that anyone can re-check without trusting the assistant.
+
+![Simulated Alexa+ display checking a child's homework: the spoken answer, the typed equations it understood, the exact line where the work breaks, and a certificate verified 17/17](docs/images/homework-check.png)
 
 > [!TIP]
 > **No install needed:** the [web demo](https://akari-h-111.github.io/algebraic-constraint-compiler/) runs the real
 > Python compiler and verifier in your browser (Guided requests, no AI). Point any MCP client at the public
 > endpoint `https://show-your-work-mcp.onrender.com/mcp` (free instance: the first request can take about
 > 50 seconds to wake it). For voice and the Claude or Gemini agent, [run it locally](#try-it-in-two-minutes).
-
-![Simulated Alexa+ display checking a child's homework: the mistake is on line 1 → 2, with the typed equations, a hint, the proof, and a verified certificate](docs/images/homework-check.png)
 
 ## Why
 
@@ -70,7 +70,7 @@ call back into the server: **Replay verifier** re-checks the proof live, and **T
 forgery** changes one number, recomputes the SHA-256, and shows that the
 verifier still rejects it.
 
-<p align="center"><img src="docs/images/no-valid-answer.png" width="49%" alt="A worksheet problem with no valid answer, certified"> <img src="docs/images/progress.png" width="49%" alt="Weekly progress rebuilt from re-verified notebook entries"></p>
+<p align="center"><img src="docs/images/needs-review.png" width="49%" alt="A line the reader could not make out is held for review: nothing is concluded about it, and the steps around it are still checked"> <img src="docs/images/no-valid-answer.png" width="49%" alt="A worksheet problem with no valid answer, certified with a two-line proof"></p>
 
 ## How it works
 
@@ -134,6 +134,9 @@ ANTHROPIC_API_KEY=...          # Claude (claude-opus-5-5) via the official SDK: 
 GEMINI_API_KEY=...             # Gemini (gemini-2.5-flash) via its OpenAI-compatible endpoint
 AWS_BEARER_TOKEN_BEDROCK=...   # Amazon Bedrock (Amazon Nova Lite)
 ```
+
+`GEMINI_API_KEY` also turns on live Gemini TTS for the spoken replies (`SYW_TTS=off` disables it;
+`SYW_TTS_VOICE` and `SYW_TTS_MODEL` choose the voice and model).
 
 With more than one key set, a switch in the top bar changes the agent's model
 live. The certificate for the same typed model doesn't change, because neither
@@ -218,7 +221,7 @@ division by zero and size limits keep their own statuses and still stop the run.
 ## Evidence
 
 ```bash
-.venv/bin/python -B -m unittest discover -s tests -p 'test*.py' -v   # 96 tests
+.venv/bin/python -B -m unittest discover -s tests -p 'test*.py' -v   # 102 tests
 python3 -B -m unittest discover -s tests -p 'test*.py'               # core on Python 3.9 (HTTP tests skip)
 ```
 
@@ -249,9 +252,12 @@ Show Your Work passes its SEP-1865 lint with 0 errors and 0 warnings.
 - Hints about the *kind* of slip are rule-based and labelled "not certified".
   The broken step itself is certified.
 - The Alexa+ experience is a simulation built for this hackathon, not an
-  Amazon product, and no Alexa account is connected. It uses the browser's
-  speech recognition and synthesis. Math never passes through the language
-  model.
+  Amazon product, and no Alexa account is connected. Spoken replies use Gemini
+  TTS: pre-recorded clips of the exact wording in the web demo (each labelled as a
+  recording in the "Behind the screen" timeline), live synthesis when you run it
+  locally with `GEMINI_API_KEY`, and your browser's voice for anything else.
+  Listening uses your browser's speech recognition. Math never passes through a
+  language model or a voice model.
 - The agent loop is tested with scripted providers, and live with Gemini
   (the demo video). Live Claude and Bedrock calls need your own key and credit.
   If a model fails, the device says so. If it calls a tool but stays silent,

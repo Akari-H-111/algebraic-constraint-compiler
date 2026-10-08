@@ -19,7 +19,11 @@ import urllib.request
 from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer
 
-from algebraic_compiler import llm, simulator
+import hashlib
+import io
+import wave
+
+from algebraic_compiler import llm, notebook, simulator, tts
 from algebraic_compiler.llm import Call, simplify_schema, sigv4
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +40,70 @@ class StaticDemoTests(unittest.TestCase):
         self.assertEqual(set(functions), set(listed))
         for tool, function in functions.items():
             self.assertEqual(sorted(listed[tool]), sorted(params[function]), tool)
+
+
+class RecordedVoiceTests(unittest.TestCase):
+    """The page plays a recorded Gemini TTS clip only for the exact text it was recorded from."""
+
+    def test_every_clip_exists_and_matches_the_engine_wording(self):
+        voice = ROOT / "algebraic_compiler" / "web" / "alexa" / "voice"
+        manifest = json.loads((voice / "manifest.json").read_text())
+        self.assertEqual(manifest["provider"], "Gemini TTS")
+        spec = importlib.util.spec_from_file_location("make_voice", ROOT / "tools" / "site" / "make_voice.py")
+        make_voice = importlib.util.module_from_spec(spec)
+        with mock.patch.dict(os.environ):
+            try:
+                spec.loader.exec_module(make_voice)
+                texts = make_voice.replies()
+            finally:
+                notebook.reset_shared(None)
+        for ident, text in texts.items():
+            digest = hashlib.sha256(text.encode()).hexdigest()
+            clip = manifest["clips"].get(digest)
+            self.assertIsNotNone(clip, f"{ident}: its wording changed, so re-record it with tools/site/make_voice.py")
+            self.assertEqual((clip["id"], clip["text_sha256"]), (ident, digest))
+            self.assertGreater((voice / clip["file"]).stat().st_size, 5000)
+        self.assertEqual(len(manifest["clips"]), len(texts))
+
+
+class GeminiVoiceTests(unittest.TestCase):
+    class Reply:
+        def __init__(self, body): self.body = body
+        def read(self): return json.dumps(self.body).encode()
+        def __enter__(self): return self
+        def __exit__(self, *exc): return False
+
+    def test_synthesize_sends_the_key_in_a_header_and_returns_wav(self):
+        import base64
+        pcm = b"\x01\x00" * 12000
+        seen = {}
+
+        def opener(request, timeout):
+            seen.update(url=request.full_url, headers=dict(request.header_items()), body=json.loads(request.data))
+            return self.Reply({"candidates": [{"content": {"parts": [{"inlineData": {
+                "mimeType": "audio/L16;codec=pcm;rate=24000", "data": base64.b64encode(pcm).decode()}}]}}]})
+        wav, seconds = tts.synthesize("x = 6 and y = 4.", "secret-key", "Kore", "some-tts-model", opener=opener)
+        self.assertNotIn("secret-key", seen["url"])
+        self.assertEqual(seen["headers"]["X-goog-api-key"], "secret-key")
+        self.assertTrue(seen["url"].endswith("/models/some-tts-model:generateContent"))
+        config = seen["body"]["generationConfig"]["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"]
+        self.assertEqual(config["voiceName"], "Kore")
+        self.assertTrue(seen["body"]["contents"][0]["parts"][0]["text"].endswith("x = 6 and y = 4."))
+        with wave.open(io.BytesIO(wav)) as w:
+            self.assertEqual((w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()), (1, 2, 24000, 12000))
+        self.assertAlmostEqual(seconds, 0.5)
+
+    def test_failures_become_tts_errors_without_leaking_the_key(self):
+        def refused(request, timeout):
+            raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {}, None)
+        with self.assertRaises(tts.TTSError) as caught:
+            tts.synthesize("hello", "secret-key", opener=refused)
+        self.assertIn("429", str(caught.exception))
+        self.assertNotIn("secret-key", str(caught.exception))
+        with self.assertRaises(tts.TTSError):
+            tts.synthesize("hello", "k", opener=lambda request, timeout: self.Reply({"candidates": []}))
+        with self.assertRaises(tts.TTSError):
+            tts.synthesize("x" * (tts.MAX_CHARS + 1), "k")
 
 
 class ProviderHelperTests(unittest.TestCase):
@@ -194,6 +262,48 @@ class SimulatorHTTPTests(unittest.TestCase):
         self.assertEqual(status, 400)
         status, turn = self.request("/api/turn", {"session": "t", "text": "hello"})
         self.assertIn("No AI model is configured", turn["reply"])
+
+    def test_recorded_clips_are_served_and_live_voice_needs_a_key(self):
+        with urllib.request.urlopen(self.base + "/voice/manifest.json") as response:
+            self.assertEqual(json.loads(response.read())["provider"], "Gemini TTS")
+        with urllib.request.urlopen(self.base + "/voice/work.mp3") as response:
+            self.assertEqual(response.headers["Content-Type"], "audio/mpeg")
+        for bad in ("/voice/nope.mp3", "/voice/..%2Fsimulator.py", "/voice/manifest.json/../../alexa.js", "/voice/.hidden"):
+            status, _ = self.request(bad)
+            self.assertEqual(status, 404, bad)
+        with mock.patch.dict(os.environ, {"GEMINI_API_KEY": ""}):
+            self.assertFalse(self.request("/api/config")[1]["voice"]["live"])
+            status, body = self.request("/api/tts", {"text": "Hello"})
+            self.assertEqual(status, 501)
+            self.assertIn("GEMINI_API_KEY", body["error"])
+
+    def test_live_voice_is_cached_validated_and_reports_failures(self):
+        calls = []
+
+        def fake(text, key, voice, model, **kwargs):
+            calls.append((text, key, voice, model))
+            return tts.wav_from_pcm(b"\x00\x00" * 2400), 0.1
+        env = {"GEMINI_API_KEY": "test-key", "SYW_TTS": "", "SYW_TTS_MODEL": "model-x", "SYW_TTS_VOICE": "Puck"}
+        with mock.patch.dict(os.environ, env), mock.patch.object(simulator.tts, "synthesize", fake):
+            self.host.voice_cache.clear()
+            config = self.request("/api/config")[1]["voice"]
+            self.assertEqual((config["live"], config["voice"], config["model"]), (True, "Puck", "model-x"))
+            for _ in range(2):
+                req = urllib.request.Request(self.base + "/api/tts", data=json.dumps({"text": "Yes, x = 4 is correct."}).encode(),
+                                             headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req) as response:
+                    self.assertEqual(response.headers["Content-Type"], "audio/wav")
+                    self.assertEqual((response.headers["X-Voice"], response.headers["X-Voice-Model"]), ("Puck", "model-x"))
+                    self.assertEqual(response.read()[:4], b"RIFF")
+            self.assertEqual(calls, [("Yes, x = 4 is correct.", "test-key", "Puck", "model-x")])  # second request came from the cache
+            self.assertEqual(self.request("/api/tts", {"text": "  "})[0], 400)
+            self.assertEqual(self.request("/api/tts", {"text": "x" * (tts.MAX_CHARS + 1)})[0], 400)
+
+            def broken(text, key, voice, model, **kwargs):
+                raise tts.TTSError("Gemini TTS returned HTTP 503")
+            with mock.patch.object(simulator.tts, "synthesize", broken):
+                status, body = self.request("/api/tts", {"text": "A different sentence."})
+            self.assertEqual((status, body["error"]), (502, "Gemini TTS returned HTTP 503"))
 
     def test_silent_model_falls_back_to_verified_suggested_speech(self):
         class Silent(ScriptedProvider):

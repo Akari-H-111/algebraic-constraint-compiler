@@ -23,4 +23,4 @@ show-your-work-alexa = "algebraic_compiler.simulator:main"
 packages = ["algebraic_compiler"]
 
 [tool.setuptools.package-data]
-algebraic_compiler = ["web/*.html", "web/*.css", "web/*.js", "web/alexa/*.html", "web/alexa/*.css", "web/alexa/*.js"]
+algebraic_compiler = ["web/*.html", "web/*.css", "web/*.js", "web/alexa/*.html", "web/alexa/*.css", "web/alexa/*.js", "web/alexa/voice/*.mp3", "web/alexa/voice/*.json"]

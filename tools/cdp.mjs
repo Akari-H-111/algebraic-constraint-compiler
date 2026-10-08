@@ -4,9 +4,11 @@
 //
 //   node tools/cdp.mjs <plan.json>
 //
-// plan.json: {"url": "...", "width": 1920, "height": 1080, "out": "dir",
+// plan.json: {"url": "...", "width": 1920, "height": 1080, "scale": 1, "out": "dir",
 //             "steps": [{"eval": "js"}, {"wait": 500}, {"shot": "name.png"},
+//                       {"shot": "part.png", "clipEval": "js returning {x, y, width, height} in CSS pixels"},
 //                       {"record": 12, "seconds": 5, "prefix": "clip"}]}
+// "scale" is the device pixel ratio (default 1); a clipped shot is cropped to that region of the page.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -49,13 +51,15 @@ const logs = [];
 listeners.push(msg => { if (msg.method === 'Runtime.consoleAPICalled') logs.push(msg.params.args.map(a => a.value ?? a.description).join(' ')); if (msg.method === 'Runtime.exceptionThrown') logs.push('EXCEPTION ' + msg.params.exceptionDetails.text + ' ' + (msg.params.exceptionDetails.exception?.description || '')); });
 
 await send('Page.enable'); await send('Runtime.enable');
-await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: plan.scale || 1, mobile: false });
 await send('Page.navigate', { url: plan.url });
 await sleep(plan.settle ?? 1500);
 
 let frameIndex = 0;
-async function shot(path) {
-  const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+async function shot(path, clip) {
+  const params = { format: 'png', captureBeyondViewport: false };
+  if (clip) params.clip = { x: clip.x, y: clip.y, width: clip.width, height: clip.height, scale: 1 };
+  const { data } = await send('Page.captureScreenshot', params);
   writeFileSync(path, Buffer.from(data, 'base64'));
 }
 for (const step of plan.steps) {
@@ -65,7 +69,15 @@ for (const step of plan.steps) {
     else if (result.result && result.result.value !== undefined && step.log) logs.push(String(result.result.value));
   }
   if (step.wait) await sleep(step.wait);
-  if (step.shot) await shot(join(plan.out, step.shot));
+  if (step.shot) {
+    let clip = null;
+    if (step.clipEval) {
+      const found = await send('Runtime.evaluate', { expression: step.clipEval, awaitPromise: true, returnByValue: true });
+      clip = found.result && found.result.value;
+      if (!clip) logs.push('CLIP ERROR ' + step.shot + ': ' + JSON.stringify(found.exceptionDetails || found.result));
+    }
+    await shot(join(plan.out, step.shot), clip);
+  }
   if (step.record) {
     // Fixed-rate capture: frames are named sequentially for ffmpeg (-framerate step.record).
     const total = Math.round(step.record * step.seconds), interval = 1000 / step.record;

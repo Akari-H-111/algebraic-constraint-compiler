@@ -12,6 +12,7 @@
   // A static build (GitHub Pages) supplies window.SYW_BACKEND, which runs the same Python
   // compiler and verifier in the browser; otherwise the simulator server answers.
   const STATIC = typeof window.SYW_BACKEND === 'function';
+  const PHONE = window.matchMedia('(max-width:700px)');
   async function api(path, body) {
     if (STATIC) return window.SYW_BACKEND(path, body);
     const response = await fetch(path, body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : undefined);
@@ -19,7 +20,12 @@
     if (!response.ok) throw new Error(data.error || ('HTTP ' + response.status));
     return data;
   }
-  function setState(name) { $('screen').className = 'screen' + (name ? ' state-' + name : ''); }
+  // The state is shown as text as well as by the light bar, so it does not depend on motion.
+  const STATE_TEXT = {listening: 'Listening…', thinking: 'Checking…', speaking: 'Speaking…'};
+  function setState(name) {
+    $('screen').className = 'screen' + (name ? ' state-' + name : '');
+    $('state-text').textContent = STATE_TEXT[name] || '';
+  }
   function tick() {
     const now = new Date();
     $('clock').textContent = now.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'});
@@ -34,17 +40,74 @@
     state.voice = preferred.map(n => voices.find(v => v.name === n || v.name.startsWith(n + ' '))).find(Boolean)
       || voices.find(v => v.lang === 'en-US') || null;
   }
-  function speak(text) {
+  // Spoken replies, in this order, and the timeline says which one was used:
+  //  1. a pre-recorded Gemini TTS clip whose recorded text is exactly the text on the screen;
+  //  2. live Gemini TTS, when the local simulator has a Gemini key;
+  //  3. the browser's own voice.
+  const VOICE_BASE = 'voice/';
+  let recorded = null, speaking = null;
+  const loadRecorded = () => recorded || (recorded = fetch(VOICE_BASE + 'manifest.json').then(r => r.ok ? r.json() : null).catch(() => null));
+  async function sha256Hex(text) {
+    if (!(window.crypto && crypto.subtle)) return null;
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+  }
+  async function chooseVoice(text) {
+    const manifest = await loadRecorded();
+    const hash = manifest && await sha256Hex(text);
+    const clip = hash && manifest.clips[hash];
+    if (clip) return {url: VOICE_BASE + clip.file, label: `Gemini TTS · pre-recorded clip (${manifest.voice}, ${clip.model})`,
+                      note: 'Recorded once from exactly this text with Gemini TTS; not a live model call.'};
+    const live = state.config && state.config.voice;
+    if (!STATIC && live && live.live) {
+      try {
+        const response = await fetch('/api/tts', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text})});
+        if (!response.ok) throw new Error((await response.json()).error || ('HTTP ' + response.status));
+        return {url: URL.createObjectURL(await response.blob()), revoke: true,
+                label: `Gemini TTS · live (${response.headers.get('X-Voice')}, ${response.headers.get('X-Voice-Model')})`,
+                note: 'Synthesised just now from the text on the screen.'};
+      } catch (error) { logEvent({type: 'notice', text: 'Gemini voice unavailable, using the browser voice: ' + error.message}); }
+    }
+    return null;
+  }
+  function playAudio(choice, started) {
     return new Promise(resolve => {
-      if (state.muted || !window.speechSynthesis || !text) return resolve();
+      const audio = new Audio(choice.url);
+      let timer = null;
+      const finish = () => { clearTimeout(timer); speaking = null; if (choice.revoke) URL.revokeObjectURL(choice.url); resolve(true); };
+      speaking = {stop: () => { audio.pause(); finish(); }};
+      audio.onended = finish;
+      audio.onerror = () => { clearTimeout(timer); speaking = null; resolve(false); };
+      audio.onloadedmetadata = () => { if (audio.duration) timer = setTimeout(finish, audio.duration * 1000 + 4000); };
+      audio.play().then(started, () => { clearTimeout(timer); speaking = null; resolve(false); });
+    });
+  }
+  function browserVoice(text) {
+    return new Promise(resolve => {
+      if (!window.speechSynthesis) return resolve();
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       if (state.voice) u.voice = state.voice;
       u.rate = 1.03; u.pitch = 1.0;
-      u.onend = u.onerror = () => { setState(''); resolve(); };
-      setState('speaking');
+      const timer = setTimeout(done, Math.min(45000, 4000 + text.length * 90));
+      function done() { clearTimeout(timer); speaking = null; resolve(); }
+      speaking = {stop: () => { speechSynthesis.cancel(); done(); }};
+      u.onend = u.onerror = done;
       speechSynthesis.speak(u);
     });
+  }
+  function stopSpeaking() { if (speaking) speaking.stop(); if (window.speechSynthesis) speechSynthesis.cancel(); }
+  async function speak(text) {
+    if (state.muted || !text) return;
+    setState('speaking');
+    try {
+      const choice = await chooseVoice(text);
+      if (state.muted) return;
+      if (choice && await playAudio(choice, () => logEvent({type: 'voice', label: choice.label, note: choice.note}))) return;
+      logEvent({type: 'voice', label: 'Browser voice (speechSynthesis)',
+                note: 'No recorded Gemini clip matches this text and live Gemini voice is not available here.'});
+      await browserVoice(text);
+    } finally { setState(''); }
   }
   function setupRecognition() {
     const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -66,7 +129,7 @@
   function listen(start) {
     if (!state.recognition || state.busy) return;
     if (start && !state.listening) {
-      if (window.speechSynthesis) speechSynthesis.cancel();
+      stopSpeaking();
       state.listening = true; $('mic').classList.add('active'); setState('listening');
       try { state.recognition.start(); } catch (e) { state.listening = false; }
     } else if (!start && state.listening) {
@@ -109,6 +172,7 @@
       }
     }
     else if (ev.type === 'reply') { add(ev.guided || ev.source ? 'speech' : 'AI explains', ev.guided ? 'Verified suggested speech' : ev.source ? 'Verified suggested speech (model said nothing)' : 'Spoken reply'); detail.textContent = ev.text; }
+    else if (ev.type === 'voice') { add('voice', ev.label); detail.textContent = ev.note; }
     else if (ev.type === 'app') { add('card → host', ev.name); detail.textContent = ev.text; }
     else { add('notice', ''); detail.className += ' error'; detail.textContent = ev.text; }
     if (ev.ms != null) kind.append(el('span', 'ms', ev.ms + ' ms'));
@@ -141,7 +205,10 @@
     }
     fit() {
       // Smart-display layout: the card gets a fixed box (the rest of the screen) and scrolls inside it.
+      // On a phone there is no such box, so the card is as tall as it reports itself (see size-changed).
       if (!this.frame) return;
+      if (PHONE.matches) { if (!this.frame.style.height || this.fixedBox) this.frame.style.height = '360px'; this.fixedBox = false; return; }
+      this.fixedBox = true;
       this.frame.style.height = Math.max(160, this.slot.clientHeight) + 'px';
     }
     post(message) { if (this.frame) this.frame.contentWindow.postMessage(message, STATIC ? '*' : this.origin); }
@@ -172,7 +239,10 @@
         this.post({jsonrpc: '2.0', method: 'ui/notifications/tool-input', params: {arguments: this.card.arguments}});
         this.post({jsonrpc: '2.0', method: 'ui/notifications/tool-result', params: this.card.result});
       } else if (m === 'ui/notifications/size-changed') {
-        // Fixed container: size hints are acknowledged by ignoring them.
+        // Fixed container on a display: size hints are acknowledged by ignoring them. On a phone the
+        // card's own height is used so the whole card can be read by scrolling the page.
+        const wanted = msg.params && Number(msg.params.height);
+        if (PHONE.matches && wanted > 0) this.frame.style.height = Math.min(Math.max(160, Math.ceil(wanted)), 2400) + 'px';
       } else if (m === 'tools/call') {
         const name = msg.params && msg.params.name;
         const started = performance.now();
@@ -265,7 +335,12 @@
       else if (cfg.static) { const b = el('b', null, 'Web demo: '); note.append(b, 'preset typed requests (no AI) run the real compiler and verifier in your browser. Tap one:'); }
       else { const b = el('b', null, 'Guided mode: '); note.append(b, 'no AI model is configured, so these preset typed requests call the same MCP tools directly. Configure Bedrock, Claude or Gemini to talk freely.'); }
       const box = $('scenarios'); box.replaceChildren();
-      cfg.scenarios.forEach(s => { const b = el('button', null, s.label); b.type = 'button'; b.title = s.utterance; b.onclick = () => cfg.provider ? submit(s.utterance) : guided(s); box.append(b); });
+      const first = $('idle-scenarios'); first.replaceChildren();
+      const chip = s => { const b = el('button', null, s.label); b.type = 'button'; b.title = s.utterance; b.onclick = () => cfg.provider ? submit(s.utterance) : guided(s); return b; };
+      cfg.scenarios.forEach(s => box.append(chip(s)));
+      // The first screen offers the three requests that show the idea; the full list stays below the screen.
+      ['work', 'review', 'tickets'].forEach(id => { const s = cfg.scenarios.find(x => x.id === id); if (s) first.append(chip(s)); });
+      $('boot-note').hidden = true;
       const info = $('server-info'); info.replaceChildren();
       if (cfg.connected) {
         info.append(el('p', null, `${cfg.server.name} ${cfg.server.version} at `), el('code', null, cfg.mcp_url));
@@ -285,7 +360,8 @@
   $('mic').addEventListener('pointerleave', () => listen(false));
   document.addEventListener('keydown', e => { if (e.code === 'Space' && document.activeElement !== $('text') && !e.repeat) { e.preventDefault(); listen(true); } });
   document.addEventListener('keyup', e => { if (e.code === 'Space' && document.activeElement !== $('text')) { e.preventDefault(); listen(false); } });
-  $('mute').addEventListener('click', () => { state.muted = !state.muted; $('mute').textContent = state.muted ? '🔇' : '🔊'; $('mute').setAttribute('aria-pressed', String(state.muted)); if (state.muted && window.speechSynthesis) speechSynthesis.cancel(); });
+  // The button is named "Voice"; pressed means spoken replies are on.
+  $('mute').addEventListener('click', () => { state.muted = !state.muted; $('mute').querySelector('.mute-icon').textContent = state.muted ? '🔇' : '🔊'; $('mute').setAttribute('aria-pressed', String(!state.muted)); if (state.muted) stopSpeaking(); });
   $('clear').addEventListener('click', () => { $('timeline').replaceChildren(); currentTurn = null; api('/api/reset', {session}).catch(() => {}); });
   if (window.speechSynthesis) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
   setupRecognition();

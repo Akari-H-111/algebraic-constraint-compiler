@@ -22,11 +22,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from . import __version__
-from . import llm
+from . import llm, tts
 from .llm import ProviderError
 from .mcp_client import MCPClient, MCPError, ui_meta
 
 WEB = Path(__file__).with_name("web") / "alexa"
+VOICE = WEB / "voice"  # recorded Gemini TTS clips and their manifest (see tools/site/make_voice.py)
+VOICE_TYPES = {".mp3": "audio/mpeg", ".json": "application/json"}
 MAX_BODY = 1_000_000
 MAX_ROUNDS = 6
 
@@ -75,6 +77,10 @@ SCENARIOS = [
 ]
 
 
+class VoiceUnavailable(Exception):
+    """Live speech is not configured (no Gemini key, or SYW_TTS=off)."""
+
+
 class Host:
     """One MCP connection and model provider shared by all browser sessions."""
 
@@ -89,6 +95,7 @@ class Host:
         self.sessions = {}
         self.lock = threading.Lock()
         self.connected = False
+        self.voice_cache = {}
 
     def ensure(self):
         if not self.connected:
@@ -96,12 +103,38 @@ class Host:
             self.mcp.tools(refresh=True)
             self.connected = True
 
+    def voice_info(self):
+        live = bool(os.environ.get("GEMINI_API_KEY")) and os.environ.get("SYW_TTS", "").lower() != "off"
+        return {"live": live, "provider": "Gemini TTS", "voice": os.environ.get("SYW_TTS_VOICE", tts.DEFAULT_VOICE),
+                "model": os.environ.get("SYW_TTS_MODEL", tts.DEFAULT_MODEL)}
+
+    def speech(self, text):
+        """Speak text that is already on the screen with Gemini TTS: (wav, voice, model). Cached per text."""
+        text = (text or "").strip()
+        if not text or len(text) > tts.MAX_CHARS:
+            raise ValueError(f"Speak between 1 and {tts.MAX_CHARS} characters")
+        info = self.voice_info()
+        if not info["live"]:
+            raise VoiceUnavailable("Live Gemini voice needs GEMINI_API_KEY in .env")
+        key = (text, info["voice"], info["model"])
+        with self.lock:
+            hit = self.voice_cache.get(key)
+        if hit is None:
+            wav, _ = tts.synthesize(text, os.environ["GEMINI_API_KEY"], info["voice"], info["model"])
+            hit = wav
+            with self.lock:
+                if len(self.voice_cache) >= 64:
+                    self.voice_cache.pop(next(iter(self.voice_cache)))
+                self.voice_cache[key] = hit
+        return hit, info["voice"], info["model"]
+
     def config(self):
         default = self.providers.get(self.default) if self.default else None
         info = {"version": __version__, "mcp_url": self.mcp.url, "notebook": self.notebook, "learner": self.learner,
                 "provider": default.name if default else None, "model": default.model if default else None,
                 "providers": [{"name": n, "model": p.model} for n, p in self.providers.items()],
                 "provider_error": "; ".join(f"{n}: {e}" for n, e in self.provider_errors.items()) or None,
+                "voice": self.voice_info(),
                 "scenarios": [{k: s[k] for k in ("id", "label", "utterance")} for s in SCENARIOS]}
         try:
             self.ensure()
@@ -242,9 +275,15 @@ def make_handler(host):
             if parsed.path in routes:
                 name, kind = routes[parsed.path]
                 extra = {"Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                         "style-src 'self' 'unsafe-inline'; frame-src 'self' http://127.0.0.1:* http://localhost:*; img-src 'self' data:"} \
+                         "style-src 'self' 'unsafe-inline'; frame-src 'self' http://127.0.0.1:* http://localhost:*; img-src 'self' data:; media-src 'self' blob:"} \
                     if name == "index.html" else None
                 return self._send(200, (WEB / name).read_bytes(), kind, extra)
+            if parsed.path.startswith("/voice/"):
+                name = parsed.path[len("/voice/"):]
+                path = VOICE / name
+                if "/" in name or name.startswith(".") or path.suffix not in VOICE_TYPES or not path.is_file():
+                    return self._send(404, {"error": "Not found"})
+                return self._send(200, path.read_bytes(), VOICE_TYPES[path.suffix])
             if parsed.path == "/api/config":
                 return self._send(200, host.config())
             if parsed.path == "/api/resource":
@@ -271,6 +310,9 @@ def make_handler(host):
                                                      str(body.get("provider") or "") or None))
                 if self.path == "/api/guided":
                     return self._send(200, host.guided(str(body.get("scenario"))))
+                if self.path == "/api/tts":
+                    wav, voice, model = host.speech(str(body.get("text", "")))
+                    return self._send(200, wav, "audio/wav", {"X-Voice": voice, "X-Voice-Model": model})
                 if self.path == "/api/tool":
                     return self._send(200, host.app_tool(str(body.get("name")), body.get("arguments") or {}))
                 if self.path == "/api/reset":
@@ -280,6 +322,10 @@ def make_handler(host):
                     return self._send(200, {"ok": True})
             except PermissionError as exc:
                 return self._send(403, {"error": str(exc)})
+            except VoiceUnavailable as exc:
+                return self._send(501, {"error": str(exc)})
+            except tts.TTSError as exc:
+                return self._send(502, {"error": str(exc)})
             except (MCPError, ValueError) as exc:
                 return self._send(502 if isinstance(exc, MCPError) else 400, {"error": str(exc)})
             self._send(404, {"error": "Not found"})

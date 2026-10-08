@@ -1,0 +1,79 @@
+{
+ "provider": "Gemini TTS",
+ "voice": "Kore",
+ "note": "Each clip is a recording of a Gemini TTS call made when tools/site/make_voice.py ran; it plays only for the exact text it was recorded from.",
+ "clips": {
+  "c0e4c97f0935b80ef69714fa11894ec3bc28bdf32fce3c52ce6d8f1e4a4ea0eb": {
+   "id": "answer",
+   "file": "answer.mp3",
+   "model": "gemini-3.1-flash-tts-preview",
+   "seconds": 5.3,
+   "text_sha256": "c0e4c97f0935b80ef69714fa11894ec3bc28bdf32fce3c52ce6d8f1e4a4ea0eb",
+   "recorded": "2026-10-08"
+  },
+  "68cd9b35844a1f36866ce2cea53bea0dea154f1e96aac9e4bd8854fed07aa471": {
+   "id": "practice",
+   "file": "practice.mp3",
+   "model": "gemini-3.1-flash-tts-preview",
+   "seconds": 7.4,
+   "text_sha256": "68cd9b35844a1f36866ce2cea53bea0dea154f1e96aac9e4bd8854fed07aa471",
+   "recorded": "2026-10-08"
+  },
+  "c7fa519615b9af6c770ed4d863c3f12b850ac8ea6081c80ea20a0b3d2b067400": {
+   "id": "progress-after-work",
+   "file": "progress-after-work.mp3",
+   "model": "gemini-3.1-flash-tts-preview",
+   "seconds": 19.0,
+   "text_sha256": "c7fa519615b9af6c770ed4d863c3f12b850ac8ea6081c80ea20a0b3d2b067400",
+   "recorded": "2026-10-08"
+  },
+  "9a4858a71c231a7d1e91e0ebcbac4b105b38031d021d03aea717e7caade3182f": {
+   "id": "progress-after-work-and-tickets",
+   "file": "progress-after-work-and-tickets.mp3",
+   "model": "gemini-3.1-flash-tts-preview",
+   "seconds": 20.8,
+   "text_sha256": "9a4858a71c231a7d1e91e0ebcbac4b105b38031d021d03aea717e7caade3182f",
+   "recorded": "2026-10-08"
+  },
+  "2f254aa98b6cbfd67cec4205f02a17eddfdae2f59ffbda12fa12dbea1305c107": {
+   "id": "progress-empty",
+   "file": "progress-empty.mp3",
+   "model": "gemini-3.1-flash-tts-preview",
+   "seconds": 7.2,
+   "text_sha256": "2f254aa98b6cbfd67cec4205f02a17eddfdae2f59ffbda12fa12dbea1305c107",
+   "recorded": "2026-10-08"
+  },
+  "1482059df34dd9071d49f428c4a5245ee1af8c7e39d1f738fd489d47c4633094": {
+   "id": "review",
+   "file": "review.mp3",
+   "model": "gemini-3.1-flash-tts-preview",
+   "seconds": 9.6,
+   "text_sha256": "1482059df34dd9071d49f428c4a5245ee1af8c7e39d1f738fd489d47c4633094",
+   "recorded": "2026-10-08"
+  },
+  "b865a7806e0263156ffc2987042e078baeecb70918ccf5bd90279a25acef8dba": {
+   "id": "system",
+   "file": "system.mp3",
+   "model": "gemini-3.1-flash-tts-preview",
+   "seconds": 7.1,
+   "text_sha256": "b865a7806e0263156ffc2987042e078baeecb70918ccf5bd90279a25acef8dba",
+   "recorded": "2026-10-08"
+  },
+  "fe2a66177ec2e81b56a68349dd2920f8f193c48c6f838d2a877f6b33732033ab": {
+   "id": "tickets",
+   "file": "tickets.mp3",
+   "model": "gemini-3.1-flash-tts-preview",
+   "seconds": 10.9,
+   "text_sha256": "fe2a66177ec2e81b56a68349dd2920f8f193c48c6f838d2a877f6b33732033ab",
+   "recorded": "2026-10-08"
+  },
+  "50e80d056aa9958cda56f54b4e21928d767cb70640547662a95dfad2531a5487": {
+   "id": "work",
+   "file": "work.mp3",
+   "model": "gemini-3.1-flash-tts-preview",
+   "seconds": 14.7,
+   "text_sha256": "50e80d056aa9958cda56f54b4e21928d767cb70640547662a95dfad2531a5487",
+   "recorded": "2026-10-08"
+  }
+ }
+}

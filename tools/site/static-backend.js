@@ -9,17 +9,28 @@
     const s = document.createElement('script'); s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('Could not load ' + src));
     document.head.append(s);
   });
-  function status(text) { const el = document.getElementById('engine-status'); if (el) el.textContent = text; }
+  // This script runs before the page is parsed, so the latest messages are repainted once it is.
+  // The note is the same message shown on the display itself, where a first-time visitor is looking.
+  const shown = {status: '', note: ''};
+  function paint() {
+    const bar = document.getElementById('engine-status'); if (bar) bar.textContent = shown.status;
+    const screen = document.getElementById('boot-note'); if (screen) { screen.textContent = shown.note; screen.hidden = !shown.note; }
+  }
+  function status(text) { shown.status = text; paint(); }
+  function note(text) { shown.note = text; paint(); }
+  document.addEventListener('DOMContentLoaded', paint);
   async function boot() {
-    status('Loading the exact Python engine into your browser (first visit ≈ 10 MB)…');
-    const [manifest, scenarios, card] = await Promise.all([
-      fetch('engine/manifest.json').then(r => r.json()), fetch('scenarios.json').then(r => r.json()),
-      fetch('engine/algebraic_compiler/web/card.html').then(r => r.text())]);
-    await loadScript(PYODIDE + 'pyodide.js');
-    const py = await loadPyodide({indexURL: PYODIDE});
-    await py.loadPackage('sqlite3');
+    status('Loading the exact Python engine into your browser (first visit ≈ 6 MB)…');
+    note('Starting the exact Python engine in your browser (first visit downloads about 6 MB)…');
+    // Everything is requested at once: the engine's source files download while Pyodide itself does.
+    const text = url => fetch(url).then(r => { if (!r.ok) throw new Error(url + ' → ' + r.status); return r.text(); });
+    const manifestP = fetch('engine/manifest.json').then(r => r.json());
+    const filesP = manifestP.then(m => Promise.all(m.files.map(file => text('engine/' + file).then(source => [file, source]))));
+    const pyP = loadScript(PYODIDE + 'pyodide.js').then(() => loadPyodide({indexURL: PYODIDE, packages: ['sqlite3']}));
+    const [scenarios, card, files, py] = await Promise.all([
+      fetch('scenarios.json').then(r => r.json()), text('engine/algebraic_compiler/web/card.html'), filesP, pyP]);
     py.FS.mkdirTree('/engine/algebraic_compiler/web');
-    for (const file of manifest.files) py.FS.writeFile('/engine/' + file, await fetch('engine/' + file).then(r => r.text()));
+    for (const [file, source] of files) py.FS.writeFile('/engine/' + file, source);
     py.runPython(`
 import json, os, sys
 sys.path.insert(0, '/engine')
@@ -48,9 +59,10 @@ def call(name, arguments_json):
     const version = py.globals.get('__version__');
     status(`Engine ready · Show Your Work ${version} running in your browser (Pyodide ${py.version})`);
     engine = {py, call: py.globals.get('call'), scenarios, card, version};
+    note('');
     return engine;
   }
-  const booting = boot().catch(error => { status('Engine failed to load: ' + error.message); throw error; });
+  const booting = boot().catch(error => { status('Engine failed to load: ' + error.message); note('The engine could not load: ' + error.message + '. Reload the page to try again.'); throw error; });
   async function callTool(name, args) {
     const e = await booting;
     return JSON.parse(e.call(name, JSON.stringify(args || {})));
