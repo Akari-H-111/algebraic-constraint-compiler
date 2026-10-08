@@ -288,21 +288,47 @@ class SimulatorHTTPTests(unittest.TestCase):
             self.host.voice_cache.clear()
             config = self.request("/api/config")[1]["voice"]
             self.assertEqual((config["live"], config["voice"], config["model"]), (True, "Puck", "model-x"))
+            # Only a reply this display has shown can be spoken, and it is spoken exactly as shown.
+            shown = self.request("/api/guided", {"scenario": "answer"})[1]["reply"]
             for _ in range(2):
-                req = urllib.request.Request(self.base + "/api/tts", data=json.dumps({"text": "Yes, x = 4 is correct."}).encode(),
+                req = urllib.request.Request(self.base + "/api/tts", data=json.dumps({"text": shown}).encode(),
                                              headers={"Content-Type": "application/json"})
                 with urllib.request.urlopen(req) as response:
                     self.assertEqual(response.headers["Content-Type"], "audio/wav")
                     self.assertEqual((response.headers["X-Voice"], response.headers["X-Voice-Model"]), ("Puck", "model-x"))
                     self.assertEqual(response.read()[:4], b"RIFF")
-            self.assertEqual(calls, [("Yes, x = 4 is correct.", "test-key", "Puck", "model-x")])  # second request came from the cache
+            self.assertEqual(calls, [(shown, "test-key", "Puck", "model-x")])  # second request came from the cache
             self.assertEqual(self.request("/api/tts", {"text": "  "})[0], 400)
             self.assertEqual(self.request("/api/tts", {"text": "x" * (tts.MAX_CHARS + 1)})[0], 400)
+            self.assertEqual(self.request("/api/tts", {"text": "Say anything you like."})[0], 403)
+            self.assertEqual(len(calls), 1)  # the refused text never reached the voice service
+
+            # Only pages this server serves may use its API (a page on another site must not spend the keys).
+            def post(headers, text=shown):
+                req = urllib.request.Request(self.base + "/api/tts", data=json.dumps({"text": text}).encode(), headers=headers)
+                try:
+                    with urllib.request.urlopen(req) as response:
+                        return response.status
+                except urllib.error.HTTPError as exc:
+                    return exc.code
+            json_type = {"Content-Type": "application/json"}
+            self.assertEqual(post({**json_type, "Origin": "http://evil.example"}), 403)
+            self.assertEqual(post({**json_type, "Origin": "null"}), 403)
+            self.assertEqual(post({**json_type, "Origin": self.base}), 200)
+            self.assertEqual(post({**json_type, "Host": "rebound.example"}), 403)
+            self.assertEqual(post({"Content-Type": "text/plain"}), 415)
+            req = urllib.request.Request(self.base + "/api/config", headers={"Host": "rebound.example"})
+            with self.assertRaises(urllib.error.HTTPError) as refused:
+                urllib.request.urlopen(req)
+            self.assertEqual(refused.exception.code, 403)
+            self.assertEqual(len(calls), 1)
+
+            other = self.request("/api/guided", {"scenario": "system"})[1]["reply"]
 
             def broken(text, key, voice, model, **kwargs):
                 raise tts.TTSError("Gemini TTS returned HTTP 503")
             with mock.patch.object(simulator.tts, "synthesize", broken):
-                status, body = self.request("/api/tts", {"text": "A different sentence."})
+                status, body = self.request("/api/tts", {"text": other})
             self.assertEqual((status, body["error"]), (502, "Gemini TTS returned HTTP 503"))
 
     def test_silent_model_falls_back_to_verified_suggested_speech(self):

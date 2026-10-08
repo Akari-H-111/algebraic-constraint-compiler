@@ -35,7 +35,7 @@ unless an independent verifier has replayed an exact proof.
 > **No install needed:** the [web demo](https://akari-h-111.github.io/algebraic-constraint-compiler/) runs the real
 > Python compiler and verifier in your browser (Guided requests, no AI). Point any MCP client at the public
 > endpoint `https://show-your-work-mcp.onrender.com/mcp` (free instance: the first request can take about
-> 50 seconds to wake it). For voice and the Claude or Gemini agent, [run it locally](#try-it-in-two-minutes).
+> 50 seconds to wake it). To ask in your own words (typed or spoken) with the Claude or Gemini agent, [run it locally](#try-it-in-two-minutes).
 
 ## Why
 
@@ -256,8 +256,8 @@ Show Your Work passes its SEP-1865 lint with 0 errors and 0 warnings.
   TTS: pre-recorded clips of the exact wording in the web demo (each labelled as a
   recording in the "Behind the screen" timeline), live synthesis when you run it
   locally with `GEMINI_API_KEY`, and your browser's voice for anything else.
-  Listening uses your browser's speech recognition. Math never passes through a
-  language model or a voice model.
+  Listening uses your browser's speech recognition. No language model or voice
+  model computes or judges the math (a voice model only reads out the reply text).
 - The agent loop is tested with scripted providers, and live with Gemini
   (the demo video). Live Claude and Bedrock calls need your own key and credit.
   If a model fails, the device says so. If it calls a tool but stays silent,

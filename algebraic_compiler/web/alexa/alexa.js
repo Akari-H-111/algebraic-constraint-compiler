@@ -22,7 +22,9 @@
   }
   // The state is shown as text as well as by the light bar, so it does not depend on motion.
   const STATE_TEXT = {listening: 'Listening…', thinking: 'Checking…', speaking: 'Speaking…'};
+  let stateName = '';
   function setState(name) {
+    stateName = name || '';
     $('screen').className = 'screen' + (name ? ' state-' + name : '');
     $('state-text').textContent = STATE_TEXT[name] || '';
   }
@@ -45,7 +47,8 @@
   //  2. live Gemini TTS, when the local simulator has a Gemini key;
   //  3. the browser's own voice.
   const VOICE_BASE = 'voice/';
-  let recorded = null, speaking = null;
+  const AUDIO_START_MS = 8000;  // audio that has not begun to play by then is given up on, so a stalled file cannot hold the page
+  let recorded = null, speaking = null, speechTurn = 0;
   const loadRecorded = () => recorded || (recorded = fetch(VOICE_BASE + 'manifest.json').then(r => r.ok ? r.json() : null).catch(() => null));
   async function sha256Hex(text) {
     if (!(window.crypto && crypto.subtle)) return null;
@@ -56,58 +59,87 @@
     const manifest = await loadRecorded();
     const hash = manifest && await sha256Hex(text);
     const clip = hash && manifest.clips[hash];
-    if (clip) return {url: VOICE_BASE + clip.file, label: `Gemini TTS · pre-recorded clip (${manifest.voice}, ${clip.model})`,
+    if (clip) return {url: VOICE_BASE + clip.file, kind: 'The recorded Gemini clip', label: `Gemini TTS · pre-recorded clip (${manifest.voice}, ${clip.model})`,
                       note: 'Recorded once from exactly this text with Gemini TTS; not a live model call.'};
     const live = state.config && state.config.voice;
     if (!STATIC && live && live.live) {
       try {
         const response = await fetch('/api/tts', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text})});
         if (!response.ok) throw new Error((await response.json()).error || ('HTTP ' + response.status));
-        return {url: URL.createObjectURL(await response.blob()), revoke: true,
+        return {url: URL.createObjectURL(await response.blob()), revoke: true, kind: 'The live Gemini audio',
                 label: `Gemini TTS · live (${response.headers.get('X-Voice')}, ${response.headers.get('X-Voice-Model')})`,
                 note: 'Synthesised just now from the text on the screen.'};
       } catch (error) { logEvent({type: 'notice', text: 'Gemini voice unavailable, using the browser voice: ' + error.message}); }
     }
     return null;
   }
+  // Resolves {ok: true} when the audio played to its end or was stopped, and {ok: false, why} when it could not play.
   function playAudio(choice, started) {
     return new Promise(resolve => {
       const audio = new Audio(choice.url);
-      let timer = null;
-      const finish = () => { clearTimeout(timer); speaking = null; if (choice.revoke) URL.revokeObjectURL(choice.url); resolve(true); };
-      speaking = {stop: () => { audio.pause(); finish(); }};
-      audio.onended = finish;
-      audio.onerror = () => { clearTimeout(timer); speaking = null; resolve(false); };
-      audio.onloadedmetadata = () => { if (audio.duration) timer = setTimeout(finish, audio.duration * 1000 + 4000); };
-      audio.play().then(started, () => { clearTimeout(timer); speaking = null; resolve(false); });
+      const handle = {stop: () => { audio.pause(); done({ok: true}); }};
+      let timer = null, over = false, began = false;
+      function done(result) {
+        if (over) return;
+        over = true; clearTimeout(timer);
+        if (speaking === handle) speaking = null;
+        if (choice.revoke) URL.revokeObjectURL(choice.url);
+        resolve(result);
+      }
+      speaking = handle;
+      audio.onended = () => done({ok: true});
+      audio.onerror = () => done({ok: false, why: 'could not be loaded'});
+      audio.onplaying = () => {
+        if (!began) { began = true; started(); }
+        clearTimeout(timer);
+        timer = setTimeout(() => { audio.pause(); done({ok: true}); }, (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 60) * 1000 + 4000);
+      };
+      timer = setTimeout(() => { audio.pause(); done({ok: false, why: `did not start within ${AUDIO_START_MS / 1000} seconds`}); }, AUDIO_START_MS);
+      audio.play().catch(error => done({ok: false, why: error && error.name === 'NotAllowedError' ? 'was blocked by the browser (autoplay)' : 'could not be played'}));
     });
   }
   function browserVoice(text) {
     return new Promise(resolve => {
-      if (!window.speechSynthesis) return resolve();
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       if (state.voice) u.voice = state.voice;
       u.rate = 1.03; u.pitch = 1.0;
+      const handle = {stop: () => { speechSynthesis.cancel(); done(); }};
       const timer = setTimeout(done, Math.min(45000, 4000 + text.length * 90));
-      function done() { clearTimeout(timer); speaking = null; resolve(); }
-      speaking = {stop: () => { speechSynthesis.cancel(); done(); }};
+      function done() { clearTimeout(timer); if (speaking === handle) speaking = null; resolve(); }
+      speaking = handle;
       u.onend = u.onerror = done;
       speechSynthesis.speak(u);
     });
   }
-  function stopSpeaking() { if (speaking) speaking.stop(); if (window.speechSynthesis) speechSynthesis.cancel(); }
+  // Stopping also retires whatever speak() call is still waiting (a fetch, a clip, the browser voice), so it
+  // cannot start talking again after the person has muted, asked something new, or pressed to talk.
+  function stopSpeaking() {
+    speechTurn++;
+    if (speaking) speaking.stop();
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    if (stateName === 'speaking') setState('');
+  }
+  // Speaks in the background: the buttons are usable while a reply is being said, and a new reply replaces it.
   async function speak(text) {
-    if (state.muted || !text) return;
+    stopSpeaking();
+    if (!text) return;
+    if (state.muted) { logEvent({type: 'voice', label: 'Muted', note: 'Spoken replies are off (Voice button), so nothing was spoken.'}); return; }
+    const turn = ++speechTurn, current = () => turn === speechTurn;
     setState('speaking');
     try {
       const choice = await chooseVoice(text);
-      if (state.muted) return;
-      if (choice && await playAudio(choice, () => logEvent({type: 'voice', label: choice.label, note: choice.note}))) return;
-      logEvent({type: 'voice', label: 'Browser voice (speechSynthesis)',
-                note: 'No recorded Gemini clip matches this text and live Gemini voice is not available here.'});
+      if (!current()) return;
+      let why = 'No recorded Gemini clip matches this text and live Gemini voice is not available here.';
+      if (choice) {
+        const played = await playAudio(choice, () => { if (current()) logEvent({type: 'voice', label: choice.label, note: choice.note}); });
+        if (!current() || played.ok) return;
+        why = `${choice.kind} ${played.why}.`;
+      }
+      if (!window.speechSynthesis) { logEvent({type: 'voice', label: 'No voice available', note: why + ' This browser has no speech synthesis, so nothing was spoken.'}); return; }
+      logEvent({type: 'voice', label: 'Browser voice (speechSynthesis)', note: choice ? why + ' The browser voice was used instead.' : why});
       await browserVoice(text);
-    } finally { setState(''); }
+    } finally { if (current() && stateName === 'speaking') setState(''); }
   }
   function setupRecognition() {
     const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -277,30 +309,48 @@
   }
 
   // ---------- turns ----------
-  async function run(label, request) {
+  // A request disables the control that started it (and hides the first-screen starters), which drops a keyboard
+  // user's focus onto the page. Callers note the focused control before touching the screen; run() puts it back.
+  function keyboardFocus() {
+    const a = document.activeElement;
+    return a && a !== document.body && a.matches && a.matches(':focus-visible') ? (a.textContent || '').trim() : null;
+  }
+  async function run(label, request, focusLabel = null) {
     if (state.busy) return;
     state.busy = true; setButtons();
+    stopSpeaking();
     logTurn(label);
     setState('thinking'); showReply('');
+    let reply = '';
     try {
       const data = await request();
       data.events.forEach(logEvent);
       showReply(data.reply);
       if (data.card) await state.host.show(data.card);
-      await speak(data.reply);
+      reply = data.reply;
     } catch (error) {
       showReply('Something went wrong: ' + error.message);
       logEvent({type: 'notice', text: error.message});
-    } finally { state.busy = false; setState(''); setButtons(); }
+    } finally {
+      state.busy = false; setState(''); setButtons();
+      const now = document.activeElement;  // a hidden or disabled control can still be reported as focused until the next frame
+      if (focusLabel !== null && (!now || now === document.body || now.disabled || !now.isConnected || now.closest('[hidden]'))) {
+        const again = [...document.querySelectorAll('#scenarios button')].find(b => b.textContent === focusLabel);
+        (again || $('text')).focus({preventScroll: true});  // keep the reply and card in view
+      }
+    }
+    speak(reply).catch(error => logEvent({type: 'notice', text: 'Voice: ' + error.message}));
   }
   function submit(text) {
+    const focus = keyboardFocus();
     showHeard(text);
     const who = MODEL_NAMES[state.provider] || state.provider;
-    run('Voice turn · ' + who, () => api('/api/turn', {session, text, provider: state.provider}));
+    run('Voice turn · ' + who, () => api('/api/turn', {session, text, provider: state.provider}), focus);
   }
   function guided(scenario) {
+    const focus = keyboardFocus();
     showHeard(scenario.utterance);
-    run('Guided request', () => api('/api/guided', {scenario: scenario.id}));
+    run('Guided request', () => api('/api/guided', {scenario: scenario.id}), focus);
   }
   function setButtons() {
     document.querySelectorAll('.scenarios button, .send').forEach(b => b.disabled = state.busy);
@@ -358,8 +408,19 @@
   $('mic').addEventListener('pointerdown', () => listen(true));
   $('mic').addEventListener('pointerup', () => listen(false));
   $('mic').addEventListener('pointerleave', () => listen(false));
-  document.addEventListener('keydown', e => { if (e.code === 'Space' && document.activeElement !== $('text') && !e.repeat) { e.preventDefault(); listen(true); } });
-  document.addEventListener('keyup', e => { if (e.code === 'Space' && document.activeElement !== $('text')) { e.preventDefault(); listen(false); } });
+  // Space is push-to-talk only when nothing else has the keyboard (the page itself, or the mic button).
+  // On any other control it keeps its normal job, so buttons, links and the details summary work from the keyboard.
+  let spaceTalking = false;
+  const spaceIsTalk = () => { const a = document.activeElement; return !a || a === document.body || a === $('mic'); };
+  document.addEventListener('keydown', e => {
+    if (e.code !== 'Space' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (spaceTalking) { e.preventDefault(); return; }
+    if (e.repeat || !state.recognition || !spaceIsTalk()) return;
+    e.preventDefault();
+    listen(true);
+    spaceTalking = state.listening;
+  });
+  document.addEventListener('keyup', e => { if (e.code === 'Space' && spaceTalking) { e.preventDefault(); spaceTalking = false; listen(false); } });
   // The button is named "Voice"; pressed means spoken replies are on.
   $('mute').addEventListener('click', () => { state.muted = !state.muted; $('mute').querySelector('.mute-icon').textContent = state.muted ? '🔇' : '🔊'; $('mute').setAttribute('aria-pressed', String(!state.muted)); if (state.muted) stopSpeaking(); });
   $('clear').addEventListener('click', () => { $('timeline').replaceChildren(); currentTurn = null; api('/api/reset', {session}).catch(() => {}); });

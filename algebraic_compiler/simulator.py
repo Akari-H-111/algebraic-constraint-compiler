@@ -29,6 +29,8 @@ from .mcp_client import MCPClient, MCPError, ui_meta
 WEB = Path(__file__).with_name("web") / "alexa"
 VOICE = WEB / "voice"  # recorded Gemini TTS clips and their manifest (see tools/site/make_voice.py)
 VOICE_TYPES = {".mp3": "audio/mpeg", ".json": "application/json"}
+LOCAL_NAMES = {"127.0.0.1", "localhost", "::1"}  # the server binds to 127.0.0.1; any other Host name is refused
+SPEAKABLE_REPLIES = 64  # how many recent on-screen replies /api/tts is willing to speak
 MAX_BODY = 1_000_000
 MAX_ROUNDS = 6
 
@@ -96,6 +98,7 @@ class Host:
         self.lock = threading.Lock()
         self.connected = False
         self.voice_cache = {}
+        self.speakable = {}  # replies this host has produced; the voice endpoint speaks nothing else
 
     def ensure(self):
         if not self.connected:
@@ -108,14 +111,27 @@ class Host:
         return {"live": live, "provider": "Gemini TTS", "voice": os.environ.get("SYW_TTS_VOICE", tts.DEFAULT_VOICE),
                 "model": os.environ.get("SYW_TTS_MODEL", tts.DEFAULT_MODEL)}
 
+    def allow_speech(self, reply):
+        """Remember a reply that was just shown, so that exactly this text may be spoken."""
+        reply = (reply or "").strip()
+        if reply:
+            with self.lock:
+                self.speakable.pop(reply, None)
+                self.speakable[reply] = True
+                while len(self.speakable) > SPEAKABLE_REPLIES:
+                    self.speakable.pop(next(iter(self.speakable)))
+
     def speech(self, text):
-        """Speak text that is already on the screen with Gemini TTS: (wav, voice, model). Cached per text."""
+        """Speak a reply that is already on the screen with Gemini TTS: (wav, voice, model). Cached per text."""
         text = (text or "").strip()
         if not text or len(text) > tts.MAX_CHARS:
             raise ValueError(f"Speak between 1 and {tts.MAX_CHARS} characters")
         info = self.voice_info()
         if not info["live"]:
             raise VoiceUnavailable("Live Gemini voice needs GEMINI_API_KEY in .env")
+        with self.lock:
+            if text not in self.speakable:
+                raise PermissionError("Only replies this display has shown can be spoken")
         key = (text, info["voice"], info["model"])
         with self.lock:
             hit = self.voice_cache.get(key)
@@ -179,6 +195,11 @@ class Host:
         return "\n".join(c.get("text", "") for c in result.get("content", []) if c.get("type") == "text")
 
     def turn(self, session_id, text, provider_name=None):
+        result = self._turn(session_id, text, provider_name)
+        self.allow_speech(result.get("reply"))
+        return result
+
+    def _turn(self, session_id, text, provider_name=None):
         self.ensure()
         events, holder = [{"type": "heard", "text": text}], {}
         name = provider_name if provider_name in self.providers else self.default
@@ -231,6 +252,7 @@ class Host:
         payload = (card or {}).get("result", {}).get("structuredContent") or {}
         reply = (payload.get("view") or {}).get("spoken") or "No result."
         events.append({"type": "reply", "text": reply, "guided": True})
+        self.allow_speech(reply)
         return {"reply": reply, "events": events, "card": card, "guided": True}
 
     def app_tool(self, name, arguments):
@@ -267,7 +289,29 @@ def make_handler(host):
             self.end_headers()
             self.wfile.write(data)
 
+        def _refuse(self, post):
+            """The reason to refuse this request, or None. Only pages this server itself serves may use its API:
+            a page on another site (or a name that merely resolves to 127.0.0.1) could otherwise make the local
+            model and voice keys do work. Sending JSON also forces a browser preflight, which this server never grants."""
+            host = self.headers.get("Host") or ""
+            try:
+                name = urlparse("//" + host).hostname
+            except ValueError:
+                name = None
+            if name not in LOCAL_NAMES:
+                return (403, "This display only answers requests addressed to 127.0.0.1 or localhost")
+            if post:
+                origin = self.headers.get("Origin")
+                if origin is not None and urlparse(origin).netloc != host:
+                    return (403, "Requests from other sites are not accepted")
+                if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
+                    return (415, "Send application/json")
+            return None
+
         def do_GET(self):
+            refused = self._refuse(post=False)
+            if refused:
+                return self._send(refused[0], {"error": refused[1]})
             parsed = urlparse(self.path)
             routes = {"/": ("index.html", "text/html; charset=utf-8"), "/alexa.js": ("alexa.js", "text/javascript; charset=utf-8"),
                       "/alexa.css": ("alexa.css", "text/css; charset=utf-8"),
@@ -294,6 +338,9 @@ def make_handler(host):
             self._send(404, {"error": "Not found"})
 
         def do_POST(self):
+            refused = self._refuse(post=True)
+            if refused:
+                return self._send(refused[0], {"error": refused[1]})
             length = int(self.headers.get("Content-Length") or 0)
             if length > MAX_BODY:
                 return self._send(413, {"error": "Request too large"})

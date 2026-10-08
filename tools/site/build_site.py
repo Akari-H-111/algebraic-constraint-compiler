@@ -16,7 +16,7 @@ ENGINE = ["__init__.py", "ir.py", "linear_ir.py", "linear.py", "linear_verifier.
           "service.py", "notebook.py", "web/card.html"]
 BANNER = ('<div class="static-banner"><b>Web demo</b> · Guided requests run the real Python compiler and independent '
           'verifier <b>in your browser</b> (Pyodide). No server, no AI. <span id="engine-status">Loading…</span> '
-          '<span class="more">· For voice, Claude/Gemini agents and the MCP server: '
+          '<span class="more">· To ask in your own words with a Claude/Gemini agent, or to use the MCP server: '
           '<a href="https://github.com/Akari-H-111/algebraic-constraint-compiler">run it locally</a>.</span></div>')
 SITE = "https://akari-h-111.github.io/algebraic-constraint-compiler/"
 DESCRIPTION = ("Check a child's math homework in your browser. The real Python compiler and an independent verifier replay "
