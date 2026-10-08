@@ -78,7 +78,7 @@ def call(name, arguments_json):
     if (path.startsWith('/api/resource')) return {uri: 'ui://show-your-work/certificate-card.html', mimeType: 'text/html;profile=mcp-app', text: e.card};
     if (path === '/api/tool') return callTool(body.name, body.arguments);
     if (path === '/api/reset') return {ok: true};
-    if (path === '/api/turn') return {reply: 'This web demo runs Guided requests only. For voice, an AI agent and the MCP server, run the simulator locally.', events: [{type: 'notice', text: 'Static demo: no language model'}], card: null};
+    if (path === '/api/turn') return {reply: 'This web demo runs Guided requests only. To ask in your own words (typed or spoken) with an AI agent, or to use the MCP server, run the simulator locally.', events: [{type: 'notice', text: 'Static demo: no language model'}], card: null};
     if (path === '/api/guided') {
       const scenario = e.scenarios.find(s => s.id === body.scenario);
       const started = performance.now();
