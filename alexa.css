@@ -1,5 +1,5 @@
 :root{
-  --page:#070a10;--panel:#0f1420;--panel2:#141b2a;--line:#222b3d;--text:#eef2fb;--muted:#96a1b8;--dim:#5f6a80;
+  --page:#070a10;--panel:#0f1420;--panel2:#141b2a;--line:#222b3d;--text:#eef2fb;--muted:#96a1b8;--dim:#808ba5;--field:#556280;
   --accent:#27d3ff;--accent2:#5b7cff;--ok:#3ccf91;--warn:#ffb14a;--bad:#ff6b70;
   --sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -9,12 +9,13 @@ html,body{margin:0;background:radial-gradient(1200px 700px at 30% -10%,#15213a 0
 button,input{font:inherit}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 24px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px}
-.brand b{display:block;font-size:17px;letter-spacing:-.01em}
+.brand h1{display:block;margin:0;font-size:17px;font-weight:700;line-height:1.3;letter-spacing:-.01em}
 .brand small{color:var(--muted);font-size:12.5px}
 .logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:800;color:#061018;background:linear-gradient(135deg,var(--accent),var(--accent2))}
 .pills{display:flex;gap:8px;flex-wrap:wrap}
 .pill{font-size:12.5px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--muted)}
 .pill.ok{color:var(--ok);border-color:rgba(60,207,145,.35)}
+.pill.sim{color:var(--text);border-color:rgba(255,255,255,.3)}
 .switch[hidden]{display:none}
 .switch{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;gap:3px;background:rgba(255,255,255,.03)}
 .switch button{border:0;border-radius:999px;padding:4px 12px;font-size:12.5px;background:transparent;color:var(--muted);cursor:pointer}
@@ -29,8 +30,11 @@ button,input{font:inherit}
 #clock{color:var(--text);font-weight:650;font-size:17px}
 .household{padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.06)}
 .skill{margin-left:auto;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.state-text{font-size:13px;color:var(--accent);min-width:0}
+#clock,.household{white-space:nowrap}
 .idle{margin:auto 0;padding:0 6px}
-.greeting{font-size:clamp(28px,4vw,52px);font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
+.idle-slot{min-height:92px;margin-top:18px}
+.boot-note{margin:0;color:var(--muted);font-size:14px}.greeting{font-size:clamp(28px,4vw,52px);font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
 .prompt{font-size:clamp(17px,2vw,24px);color:#cfd7ea;margin:0 0 6px}
 .sub{color:var(--muted);margin:0}
 .conversation{margin:10px 0 8px}
@@ -53,11 +57,14 @@ button,input{font:inherit}
 .mic span{position:absolute;inset:17px 21px;border-radius:8px;background:#071019}
 .mic.active{animation:pulse .9s ease-in-out infinite}
 .mic:disabled{opacity:.4;cursor:not-allowed}
-#text{flex:1;min-width:0;padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--text);outline:none}
+#text{flex:1;min-width:0;padding:14px 16px;border-radius:14px;border:1px solid var(--field);background:var(--panel);color:var(--text);outline:none}
+#text::placeholder{color:#8791a8;opacity:1}
 #text:focus{border-color:var(--accent)}
 .send{padding:13px 18px;border-radius:14px;border:0;background:var(--text);color:#0b0f17;font-weight:650;cursor:pointer}
 .ghost{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:12px;padding:10px 12px;cursor:pointer}
 .ghost.small{padding:5px 10px;font-size:12.5px}
+#mute{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:44px}
+#mute[aria-pressed=false]{color:var(--warn);border-color:rgba(255,177,74,.45)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .mode-note{color:var(--muted);font-size:13px;margin:4px 0 8px}
 .mode-note b{color:var(--warn)}
@@ -89,4 +96,36 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .server-info ul{padding-left:18px;margin:6px 0}
 .disclaimer{color:var(--dim);font-size:12px;text-align:center;padding:10px 24px 18px}
 
+/* Phones: the 16:10 smart-display box would leave the card no height, so the screen grows with
+   its content and the card is as tall as the card says it is (see AppHost.fit). */
+@media (max-width:700px){
+  .topbar{padding:10px 12px}
+  .stage{padding:6px 12px 10px;gap:14px}
+  .device{padding:8px;border-radius:22px}
+  .screen{aspect-ratio:auto;min-height:240px;border-radius:14px;padding:14px 12px 20px}
+  .statusbar{flex-wrap:wrap;gap:4px 10px;font-size:13px}
+  #clock{font-size:15px}
+  .card-slot{flex:none;overflow:visible}
+  .idle{padding:0}
+  .idle-slot{min-height:120px}
+  .talk{gap:8px}
+  .mic{width:46px;height:46px}
+  .mic span{inset:14px 18px}
+  .send{padding:12px 14px}
+  .disclaimer{padding:10px 12px 18px}
+}
+@media (max-width:560px){
+  .skill{display:none}
+  .mute-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
+
+/* Reduced motion: the state is still shown (the status text and a steady bar), without movement. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .state-listening .lightbar,.state-thinking .lightbar,.state-speaking .lightbar{background:var(--accent);box-shadow:none}
+  .state-listening .lightbar{height:8px}
+  .mic.active{box-shadow:0 0 0 4px var(--accent)}
+}
+
 .static-banner{font-size:13px;color:#cfd7ea;background:rgba(39,211,255,.08);border-bottom:1px solid rgba(39,211,255,.25);padding:8px 24px}.static-banner a{color:#27d3ff}#engine-status{color:#96a1b8}
+@media (max-width:560px){.static-banner{padding:8px 12px}.static-banner .more{display:none}}

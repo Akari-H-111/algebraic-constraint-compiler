@@ -4,15 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Show Your Work · Web demo</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Show Your Work: math answers Alexa+ can prove">
+<meta property="og:description" content="Check a child's math homework in your browser. The real Python compiler and an independent verifier replay an exact proof. No server, no AI. A simulated Alexa+ display, not an Amazon product.">
+<meta property="og:url" content="https://akari-h-111.github.io/algebraic-constraint-compiler/">
+<meta property="og:image" content="https://akari-h-111.github.io/algebraic-constraint-compiler/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Show Your Work: a simulated Alexa+ display showing the exact line where a homework answer changes, with a verified certificate">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<meta name="description" content="Check a child's math homework in your browser. The real Python compiler and an independent verifier replay an exact proof. No server, no AI. A simulated Alexa+ display, not an Amazon product.">
+<meta name="theme-color" content="#070a10">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2327d3ff'/%3E%3Cstop offset='1' stop-color='%235b7cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M9 16.5l5 5 9-10' fill='none' stroke='%23061018' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="alexa.css">
 <script src="static-backend.js"></script>
 <script src="alexa.js" defer></script>
 </head>
 <body>
-<div class="static-banner"><b>Web demo</b> · Guided requests run the real Python compiler and independent verifier <b>in your browser</b> (Pyodide). No server, no AI. <span id="engine-status">Loading…</span> · For voice, Claude/Gemini agents and the MCP server: <a href="https://github.com/Akari-H-111/algebraic-constraint-compiler">run it locally</a>.</div>
+<div class="static-banner"><b>Web demo</b> · Guided requests run the real Python compiler and independent verifier <b>in your browser</b> (Pyodide). No server, no AI. <span id="engine-status">Loading…</span> <span class="more">· For voice, Claude/Gemini agents and the MCP server: <a href="https://github.com/Akari-H-111/algebraic-constraint-compiler">run it locally</a>.</span></div>
 <header class="topbar">
-  <div class="brand"><span class="logo" aria-hidden="true">✓</span><div><b>Show Your Work</b><small>Math answers an assistant can prove</small></div></div>
+  <div class="brand"><span class="logo" aria-hidden="true">✓</span><div><h1>Show Your Work</h1><small>Math answers an assistant can prove</small></div></div>
   <div class="pills">
+    <span class="pill sim">Simulated Alexa+ display · not an Amazon product</span>
     <span id="mcp-pill" class="pill">MCP · connecting…</span>
     <span id="model-pill" class="pill">Model · …</span>
     <span id="model-switch" class="switch" role="radiogroup" aria-label="Language model" hidden></span>
@@ -23,11 +37,15 @@
   <section class="device-column">
     <div class="device" id="device">
       <div class="screen" id="screen">
-        <div class="statusbar"><span id="clock">--:--</span><span class="household" id="household">Rivera family · Maya</span><span class="skill">Show Your Work</span></div>
+        <div class="statusbar"><span id="clock">--:--</span><span class="household" id="household">Rivera family · Maya</span><span class="state-text" id="state-text" role="status"></span><span class="skill">Show Your Work</span></div>
         <div class="idle" id="idle">
           <p class="greeting" id="greeting">Good evening</p>
           <p class="prompt">Try “Alexa, check Maya’s homework.”</p>
           <p class="sub">Answers appear only after an independent verifier replays the proof.</p>
+          <div class="idle-slot">
+            <p class="boot-note" id="boot-note" role="status" hidden></p>
+            <div class="scenarios idle-scenarios" id="idle-scenarios" aria-label="Start with one of these"></div>
+          </div>
         </div>
         <div class="conversation" id="conversation" hidden>
           <p class="heard" id="heard"></p>
@@ -41,7 +59,7 @@
       <button type="button" id="mic" class="mic" aria-label="Hold to talk (or hold Space)" title="Hold to talk (or hold Space)"><span></span></button>
       <input id="text" type="text" placeholder="Type what you’d say to Alexa…" aria-label="What you would say" maxlength="1000">
       <button type="submit" class="send">Send</button>
-      <button type="button" id="mute" class="ghost" aria-pressed="false" title="Mute spoken replies">🔊</button>
+      <button type="button" id="mute" class="ghost" aria-pressed="true" title="Spoken replies on or off. Voice: Gemini TTS (recorded clips here, live when run locally with a Gemini key), browser voice otherwise"><span class="mute-icon" aria-hidden="true">🔊</span><span class="mute-label">Voice</span></button>
     </form>
     <div class="guided">
       <p id="mode-note" class="mode-note"></p>
@@ -56,6 +74,6 @@
     <details class="server"><summary>MCP server &amp; tools</summary><div id="server-info" class="server-info"></div></details>
   </aside>
 </main>
-<footer class="disclaimer">Simulated Alexa+ experience built for the Amazon Developer Hackathon. Not an Amazon product. Voice uses your browser’s speech features; math never touches the language model.</footer>
+<footer class="disclaimer">Simulated Alexa+ experience built for the Amazon Developer Hackathon. Not an Amazon product. Spoken replies use Gemini TTS (pre-recorded clips of the exact wording here; live when run locally with a Gemini key) and fall back to your browser’s voice; listening uses your browser’s speech recognition. Math never touches a language model or a voice model.</footer>
 </body>
 </html>
