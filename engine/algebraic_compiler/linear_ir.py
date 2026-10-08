@@ -23,6 +23,9 @@ MAX_UNKNOWNS = 12
 MAX_STEPS = 16
 MAX_TEXT = 300
 MAX_BITS = 256
+MAX_SPAN = 10 ** 7
+MAX_NOTE = 200
+REVIEW_REASONS = ("AMBIGUOUS_SYMBOL", "AMBIGUOUS_GROUPING", "ILLEGIBLE", "UNPARSEABLE", "OTHER")
 
 _TRANSLATE = str.maketrans({"−": "-", "–": "-", "×": "*", "·": "*", "⋅": "*",
                             "÷": "/", "⁄": "/", " ": " "})
@@ -207,17 +210,89 @@ def normalize_answer(raw):
     return {**_common(raw, names), "task": "answer", "equations": equations, "answer": values}
 
 
+def _locator(value):
+    """Where a line came from. Integers only; the compiler never inspects the source itself."""
+    require(type(value) is dict and value.get("kind") in ("text", "region"), "INVALID_SCHEMA",
+            "source must be {kind: 'text', start, end} or {kind: 'region', page, box}")
+    whole = lambda x, high: type(x) is int and 0 <= x <= high
+    if value["kind"] == "text":
+        fields(value, ("kind", "start", "end"))
+        require(whole(value["start"], MAX_SPAN) and whole(value["end"], MAX_SPAN) and value["start"] < value["end"],
+                "INVALID_SCHEMA", "A text source needs whole-number offsets with start < end")
+        return {"kind": "text", "start": value["start"], "end": value["end"]}
+    fields(value, ("kind", "page", "box"))
+    box = value["box"]
+    require(whole(value["page"], MAX_SPAN) and type(box) is list and len(box) == 4
+            and all(whole(c, MAX_SPAN) for c in box) and box[0] < box[2] and box[1] < box[3],
+            "INVALID_SCHEMA", "A region source needs a page and a whole-number box [left, top, right, bottom]")
+    return {"kind": "region", "page": value["page"], "box": list(box)}
+
+
+def _provenance(value, count):
+    """Optional notes aligned with the lines of work: source span, verbatim text, review flag.
+
+    They are bound into the input digest but never used as mathematics. All-empty
+    notes are dropped so that work without provenance keeps its original digest.
+    """
+    require(type(value) is list and len(value) == count, "INVALID_SCHEMA",
+            "provenance must have exactly one entry (or null) per line of work")
+    notes = []
+    for item in value:
+        if item is None:
+            notes.append(None)
+            continue
+        fields(item, (), ("source", "raw", "review"))
+        note = {}
+        if "source" in item:
+            note["source"] = _locator(item["source"])
+        if "raw" in item:
+            require(type(item["raw"]) is str, "INVALID_SCHEMA", "raw must be the text as it was read")
+            raw = " ".join(item["raw"].split())
+            require(0 < len(raw) <= MAX_TEXT, "INVALID_SCHEMA", f"raw must be 1-{MAX_TEXT} characters")
+            note["raw"] = raw
+        if "review" in item:
+            review = item["review"]
+            fields(review, ("reason",), ("note",))
+            require(review["reason"] in REVIEW_REASONS, "INVALID_SCHEMA",
+                    "review reason must be one of " + ", ".join(REVIEW_REASONS))
+            note["review"] = {"reason": review["reason"]}
+            if "note" in review:
+                require(type(review["note"]) is str, "INVALID_SCHEMA", "review note must be text")
+                text = " ".join(review["note"].split())[:MAX_NOTE]
+                if text:
+                    note["review"]["note"] = text
+        notes.append(note or None)
+    return notes if any(notes) else None
+
+
+def review_lines(spec):
+    """Indices of lines the producer must not judge: a person has to confirm how they read."""
+    return [i for i, note in enumerate(spec.get("provenance") or []) if note and "review" in note]
+
+
+def work_unknowns(spec):
+    """Unknown names across the lines that are actually checked (review lines are not read)."""
+    held = set(review_lines(spec))
+    return unknowns_in([text for i, line in enumerate(spec["steps"]) if i not in held for text in line])
+
+
 def normalize_work(raw):
-    fields(raw, ("steps",), ("schema_version", "task", "domain", "labels", "question"))
+    fields(raw, ("steps",), ("schema_version", "task", "domain", "labels", "question", "provenance"))
     require(raw.get("schema_version", SCHEMA) == SCHEMA, "UNSUPPORTED_SCHEMA", "Expected schema 1")
     require(raw.get("task", "work") == "work", "INVALID_SCHEMA", "task must be work")
     steps = raw["steps"]
     require(type(steps) is list and 2 <= len(steps) <= MAX_STEPS, "INVALID_SCHEMA",
             f"steps must list 2-{MAX_STEPS} lines of work, starting with the original problem")
-    lines = [_system(step, "each step") for step in steps]
-    names = unknowns_in([text for line in lines for text in line])
+    notes = _provenance(raw["provenance"], len(steps)) if "provenance" in raw else None
+    held = {i for i, note in enumerate(notes or []) if note and "review" in note}
+    # A line under review may carry the reader's best guess, or nothing if nothing was legible.
+    lines = [[] if i in held and (step in ([], None)) else _system(step, "each step") for i, step in enumerate(steps)]
+    spec = {"task": "work", "steps": lines}
+    if notes:
+        spec["provenance"] = notes
+    names = work_unknowns(spec)
     require(0 < len(names) <= MAX_UNKNOWNS, "INVALID_SCHEMA", f"Use 1-{MAX_UNKNOWNS} unknowns")
-    return {**_common(raw, names), "task": "work", "steps": lines}
+    return {**_common(raw, names), **spec}
 
 
 NORMALIZERS = {"solve": normalize_solve, "answer": normalize_answer, "work": normalize_work}

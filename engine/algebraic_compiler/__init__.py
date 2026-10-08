@@ -1,3 +1,3 @@
 """Show Your Work / Algebraic Constraint Compiler: exact certificates, independent replay (no LLM authority)."""
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"

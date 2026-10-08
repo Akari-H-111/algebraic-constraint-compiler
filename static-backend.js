@@ -31,7 +31,7 @@ TOOLS = {'solve_equations': service.solve, 'check_answer': service.check_answer,
          'verify_certificate': service.verify, 'forgery_check': service.forge}
 NAMES = {'solve_equations': ('equations', 'domain', 'labels', 'question', 'notebook', 'learner'),
          'check_answer': ('equations', 'answer', 'domain', 'labels', 'question', 'notebook', 'learner'),
-         'check_work': ('steps', 'domain', 'labels', 'question', 'notebook', 'learner'),
+         'check_work': ('steps', 'domain', 'labels', 'question', 'notebook', 'learner', 'provenance'),
          'practice_problem': ('kind', 'seed', 'notebook', 'learner'), 'progress_report': ('notebook', 'learner', 'days'),
          'notebook_history': ('notebook', 'learner', 'limit'), 'verify_certificate': ('bundle',), 'forgery_check': ('bundle',)}
 def call(name, arguments_json):

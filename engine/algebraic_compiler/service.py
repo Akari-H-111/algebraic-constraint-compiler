@@ -5,6 +5,7 @@ and is replayed by the independent verifier before it is explained or saved.
 """
 
 import copy
+import json
 
 from .ir import InputError, digest
 from . import linear, notebook as notebooks
@@ -24,7 +25,7 @@ def _payload(run, notebook=None, learner=None, kind="result"):
                "replay": _replay_summary(replay), "saved": None}
     if run.get("message"):
         payload["message"] = run["message"]
-    if notebook and payload["certificate_verified"]:
+    if notebook and payload["certificate_verified"] and view["verdict"] != "needs_review":
         hint = None
         for step in run["bundle"]["certificate"]["result"].get("transitions", []):
             if step.get("hint"):
@@ -78,8 +79,9 @@ def check_answer(equations, answer, domain="rational", labels=None, question=Non
 
 
 @_guarded
-def check_work(steps, domain="rational", labels=None, question=None, notebook=None, learner=None):
-    return _payload(linear.run(_spec("work", {"steps": steps}, domain, labels, question)), notebook, learner)
+def check_work(steps, domain="rational", labels=None, question=None, notebook=None, learner=None, provenance=None):
+    body = {"steps": steps, **({"provenance": provenance} if provenance is not None else {})}
+    return _payload(linear.run(_spec("work", body, domain, labels, question)), notebook, learner)
 
 
 @_guarded
@@ -154,7 +156,7 @@ def forge(bundle):
         for key in WITNESS_KEYS:
             if key in result and bump(result[key]):
                 return key
-        for key in ("transitions", "unique_solution", "original_solution"):
+        for key in ("transitions", "unique_solution", "original_solution", "lines"):
             if key in result and bump(result[key]):
                 return key
         return None
@@ -251,6 +253,14 @@ def summary_text(payload):
     lines.append("suggested_speech=" + str(view.get("spoken")))
     for step in view.get("steps", [])[:8]:
         lines.append("step: " + step)
+    for item in view.get("review", [])[:4]:
+        lines.append(f"review: line {item['step_index'] + 1} ({item['reason']}) read as: {item['reading']}"
+                     + (f" source={json.dumps(item['source'], sort_keys=True)}" if item.get("source") else ""))
+    if view.get("focus") and view.get("verdict") == "error_found" and view["focus"].get("source"):
+        lines.append("highlight: " + json.dumps(view["focus"], sort_keys=True))
+    if view.get("verdict") == "needs_review":
+        lines.append("next=ask the person to confirm or rewrite the flagged line, then call check_work again; "
+                     "do not guess how it should read, and do not say the work is right or wrong yet")
     if view.get("hint"):
         lines.append(view["hint"])
     if view.get("reveal"):

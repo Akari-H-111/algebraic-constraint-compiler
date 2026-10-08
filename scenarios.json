@@ -19,6 +19,36 @@
   }
  },
  {
+  "id": "review",
+  "label": "A line I can't read",
+  "utterance": "Alexa, check Maya's homework. The problem is 3x + 5 = 20. Her second line looks like 3x equals 1-S, I can't tell if that's a 5, and then she wrote x = 5.",
+  "tool": "check_work",
+  "arguments": {
+   "steps": [
+    [
+     "3x + 5 = 20"
+    ],
+    [
+     "3x = 15"
+    ],
+    [
+     "x = 5"
+    ]
+   ],
+   "provenance": [
+    null,
+    {
+     "raw": "3x = 1S",
+     "review": {
+      "reason": "AMBIGUOUS_SYMBOL",
+      "note": "5 or S?"
+     }
+    },
+    null
+   ]
+  }
+ },
+ {
   "id": "tickets",
   "label": "A worksheet with a typo",
   "utterance": "Alexa, adult tickets cost $12 and child tickets cost $7. They sold 20 tickets for $300. How many child tickets?",

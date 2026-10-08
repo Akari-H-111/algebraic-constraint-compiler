@@ -9,7 +9,7 @@ rule-based guesses and are labelled as not certified.
 from fractions import Fraction
 from math import gcd
 
-from .linear_ir import display, read_exact_json, tokens, unknowns_in
+from .linear_ir import display, read_exact_json, review_lines, tokens, unknowns_in, work_unknowns
 
 MINUS = "−"
 
@@ -145,13 +145,63 @@ def _derivation_lines(names, matrix, rhs, derivations, solution):
     return lines
 
 
+REVIEW_TEXT = {"AMBIGUOUS_SYMBOL": "a symbol could be read more than one way",
+               "AMBIGUOUS_GROUPING": "the grouping isn't clear", "ILLEGIBLE": "it was hard to read",
+               "UNPARSEABLE": "it doesn't read as an equation", "OTHER": "it needs a second look"}
+
+
+def _note(spec, index):
+    notes = spec.get("provenance") or []
+    return (notes[index] if index < len(notes) else None) or {}
+
+
+def _shown(spec, index):
+    """The line as read, else the verbatim text, else a plain marker. Never invents a reading."""
+    return " ; ".join(spec["steps"][index]) or _note(spec, index).get("raw") or "(nothing legible)"
+
+
+def _where(source):
+    if not source:
+        return ""
+    if source["kind"] == "text":
+        return f"characters {source['start']}–{source['end']}"
+    left, top, right, bottom = source["box"]
+    return f"page {source['page']}, box {left},{top}–{right},{bottom}"
+
+
+def _focus(spec, index):
+    """Machine-readable pointer to one line of work so a host can highlight it."""
+    note = _note(spec, index)
+    focus = {"step_index": index}
+    if note.get("source"):
+        focus["source"] = note["source"]
+    if note.get("raw"):
+        focus["raw"] = note["raw"]
+    return focus
+
+
+def _review_items(spec):
+    items = []
+    for index in review_lines(spec):
+        review = _note(spec, index)["review"]
+        item = {**_focus(spec, index), "reason": review["reason"], "reading": _shown(spec, index)}
+        if review.get("note"):
+            item["note"] = review["note"]
+        items.append(item)
+    return items
+
+
 def _translation(spec):
     equations = spec.get("equations") or [e for line in spec["steps"] for e in line]
-    names = unknowns_in(equations)
+    names = work_unknowns(spec) if spec["task"] == "work" else unknowns_in(equations)
     labels = spec.get("labels", {})
     domain = {"rational": "any exact number", "integer": "whole numbers (may be negative)",
               "nonnegative_integer": "whole numbers, 0 or more"}[spec["domain"]]
-    return {"equations": spec.get("equations"), "steps": spec.get("steps"),
+    steps = spec.get("steps")
+    if steps and review_lines(spec):
+        held = set(review_lines(spec))
+        steps = [[_shown(spec, i) + "  (needs review)"] if i in held else line for i, line in enumerate(steps)]
+    return {"equations": spec.get("equations"), "steps": steps,
             "unknowns": _named(names, labels), "domain": domain, "question": spec.get("question")}
 
 
@@ -255,18 +305,38 @@ def explain(run_output, replay=None):
         steps = spec["steps"]
         transitions = result["transitions"]
         first = result["first_error"]
+        held = review_lines(spec)
         for t in transitions:
-            before, after = " ; ".join(steps[t["from"]]), " ; ".join(steps[t["to"]])
+            before, after = _shown(spec, t["from"]), _shown(spec, t["to"])
             if t["status"] == "sound":
                 view["steps"].append(f"✓ Line {t['from'] + 1} → {t['to'] + 1}: {after} follows from {before}")
             elif t["status"] == "vacuous":
                 view["steps"].append(f"• Line {t['from'] + 1} already has no solution, so anything follows from it")
+            elif t["status"] == "needs_review":
+                blocked = next(i for i in (t["from"], t["to"]) if i in held)
+                view["steps"].append(f"? Line {t['from'] + 1} → {t['to'] + 1}: not checked, because line {blocked + 1} needs review")
             else:
                 point = [_q(x) for x in t["point"]]
                 e = t["failing_equation"]
                 view["steps"].append(f"✗ Line {t['from'] + 1} → {t['to'] + 1}: with {_solution_text(names, point)}, "
                                      f"{before} holds but {substituted(steps[t['to']][e], names, point)} does not")
-        if first is None:
+        for item in _review_items(spec):
+            where = _where(item.get("source"))
+            view["steps"].append(f"Line {item['step_index'] + 1} needs review: {REVIEW_TEXT[item['reason']]}. "
+                                 f"I have it as: {item['reading']}" + (f" ({where})" if where else ""))
+        if held:
+            view["review"] = _review_items(spec)
+        if first is None and held:
+            line = held[0] + 1
+            checked = sum(1 for t in transitions if t["status"] in ("sound", "vacuous"))
+            view.update(tone="warning", verdict="needs_review",
+                        title=f"Line {line} needs your confirmation before I can check the work.",
+                        spoken=(f"I can't say yet whether the work is right, because line {line} isn't clear: "
+                                f"{REVIEW_TEXT[_note(spec, held[0])['review']['reason']]}. "
+                                + (f"The {checked} step{'s' if checked != 1 else ''} I could read all follow. " if checked else "")
+                                + f"What does line {line} say?"))
+            view["focus"] = _focus(spec, held[0])
+        elif first is None:
             final = result.get("final_solution")
             original = result.get("original_solution")
             same = final and original and final["solution"] == original["solution"]
@@ -279,12 +349,15 @@ def explain(run_output, replay=None):
             point = [_q(x) for x in t["point"]]
             e = t["failing_equation"]
             wrong = steps[t["to"]][e]
+            earlier = [i for i in held if i < t["from"]]
             view.update(tone="warning", verdict="error_found",
                         title=f"Line {t['from'] + 1} → {t['to'] + 1} changes the answer.",
                         spoken=f"Almost! The mistake is going from line {t['from'] + 1} to line {t['to'] + 1}. "
                                f"{_solution_text(names, point)} works before that step, but in {wrong} it gives "
-                               f"{_side_values(steps[t['to']][e], names, point)}.")
+                               f"{_side_values(steps[t['to']][e], names, point)}."
+                               + (f" Line {earlier[0] + 1} still needs review, so there may be an earlier slip." if earlier else ""))
             view["hint"] = _hint_text(t.get("hint"))
+            view["focus"] = _focus(spec, t["to"])
             original = result.get("original_solution")
             if original:
                 view["reveal"] = f"Verified answer: {_solution_text(names, [_q(x) for x in original['solution']], labels)}"
@@ -292,6 +365,8 @@ def explain(run_output, replay=None):
                      {"label": "Independent checks", "value": f"{checks} passed" if checks is not None else "replayed"},
                      {"label": "Input SHA-256", "value": cert["input_sha256"][:16] + "…"},
                      {"label": "Certificate", "value": cert["certificate_sha256"][:16] + "…"}]
+    if cert["task"] == "work" and review_lines(spec):
+        view["facts"].insert(1, {"label": "Lines to review", "value": ", ".join(str(i + 1) for i in review_lines(spec))})
     return view
 
 
