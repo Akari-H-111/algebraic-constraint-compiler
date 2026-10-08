@@ -18,6 +18,13 @@ h1{font-size:92px;line-height:.98;margin:0 0 22px;letter-spacing:-.04em}
 .thesis span{color:var(--accent)}
 .shot{position:absolute;right:60px;top:150px;width:740px;height:700px;border-radius:20px;overflow:hidden;border:1px solid #2a3552;background:#111726;box-shadow:0 30px 80px rgba(0,0,0,.55)}
 .shot img{position:absolute;display:block;width:1295px;left:0;top:0}
+/* #wide: the 16:9 version used as a video poster (1280x720) */
+body.wide{width:1280px;height:720px}html:has(body.wide){width:1280px;height:720px}
+.wide .left{left:60px;top:52px;width:540px}.wide .logo{width:64px;height:64px;font-size:38px;border-radius:18px;margin-bottom:18px}
+.wide h1{font-size:78px;margin-bottom:16px}.wide .sub{font-size:30px;margin-bottom:22px}.wide .chips{gap:10px}.wide .chip{font-size:21px}
+.wide .thesis{font-size:26px;margin-top:26px}
+.wide .shot{right:48px;top:96px;width:610px;height:494px;border-radius:18px}.wide .shot img{width:1070px}
+.wide .sim{right:48px;top:604px;font-size:20px}
 </style>
 </head>
 <body>
@@ -35,5 +42,6 @@ h1{font-size:92px;line-height:.98;margin:0 0 22px;letter-spacing:-.04em}
 </div>
 <div class="shot"><img src="../../docs/images/card-work.png" alt=""></div>
 <p class="sim">Simulated Alexa+ display · not an Amazon product</p>
+<script>if (location.hash === '#wide') document.body.classList.add('wide');</script>
 </body>
 </html>

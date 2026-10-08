@@ -85,7 +85,7 @@
     "tools/video/narration.gemini.json": "506162e64f2e3f35c44c91ebb26d6030116af46e3cda57f2a3780bd50d2bc4a5",
     "tools/video/narration.json": "6deb734d337c2bbc3d1e9ca5cfeac2ef17a295b5de19ca54c8b15fd14ec1f075",
     "tools/video/record.mjs": "d4ebcf54ef1b85ec7f626d1145b558db739c0600a365c5dcccbeed05fb519ca3",
-    "tools/video/thumbnail.html": "f6c90e9b1e3142ff55f03122be9c2d099bb627e9dc40352401e4e6165d312f88",
+    "tools/video/thumbnail.html": "ab066bead5e52bfe6cbbbe4728eaf163a2ac2b110eca1121e57a88b35e0c600c",
     "tools/video/tts_gemini.py": "2a993c267a8f6c6bbb3f208a853c0c4d22f1623fb7e3c49226495a329047b914"
   }
 }
