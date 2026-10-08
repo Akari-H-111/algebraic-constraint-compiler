@@ -38,6 +38,10 @@ with exact rationals and an independent verifier replays every certificate.
 - Homework: prefer check_work (every line of the student's work, first line = the
   original problem) or check_answer before solve_equations. Give the hint first;
   reveal the verified answer only when asked.
+- Handwritten or photographed work: if you are not sure how a line reads, flag it in
+  check_work's provenance (review) instead of guessing; a needs_review result names the
+  line, so ask the person to confirm it. Add source = where the line is on the page and
+  raw = what you saw, so the first bad step can be pointed to exactly.
 - Speak the suggested_speech in one or two short sentences. Only state what a
   result with certificate_verified=true says. MATHEMATICALLY_REJECTED with
   certificate_verified=true is a certified finding (no solution, wrong answer,
@@ -62,6 +66,12 @@ Equations = Annotated[list[str], Field(min_length=1, max_length=12, description=
 Domain = Annotated[Literal["rational", "integer", "nonnegative_integer"], Field(description=(
     "What the unknowns may be: any exact number, whole numbers, or whole numbers 0 or more (counts)."))]
 Labels = Annotated[Optional[dict[str, str]], Field(description="Optional meaning of each unknown, e.g. {'a': 'adult tickets'}.")]
+Provenance = Annotated[Optional[list[Optional[dict]]], Field(description=(
+    "Optional notes, one per line of work (null if none), to keep each line tied to where it came from. Each note "
+    "may hold: source = {kind:'region', page, box:[left, top, right, bottom]} or {kind:'text', start, end} "
+    "(whole numbers only); raw = the text exactly as you read it; review = {reason, note} when you are NOT sure "
+    "how the line reads (reason: AMBIGUOUS_SYMBOL, AMBIGUOUS_GROUPING, ILLEGIBLE, UNPARSEABLE or OTHER). "
+    "A line with review is not judged: put your best guess in steps or [] if nothing is legible."))]
 Question = Annotated[Optional[str], Field(max_length=600, description="The person's original wording, shown back for checking.")]
 NotebookName = Annotated[Optional[str], Field(max_length=40, description="Optional family notebook to save this verified result in.")]
 Learner = Annotated[Optional[str], Field(max_length=40, description="Optional first name of the learner, for progress reports.")]
@@ -123,14 +133,18 @@ def create_server(port=8000, host="127.0.0.1"):
                              "Each line of the student's work as a list of equations, first line = the original "
                              "problem, e.g. [['3x + 5 = 20'], ['3x = 25'], ['x = 25/3']]."))],
                          domain: Domain = "rational", labels: Labels = None, question: Question = None,
-                         notebook: NotebookName = None, learner: Learner = None) -> CallToolResult:
+                         notebook: NotebookName = None, learner: Learner = None,
+                         provenance: Provenance = None) -> CallToolResult:
         """Find the first line of work that changes the answer, with a certified counterexample.
 
         Each sound step is proved by expressing the new equations as exact combinations of
         the previous line. A broken step is shown by a value that satisfies the previous
         line but not the next one. Hints about the kind of slip are not certified.
+        Lines you could not read with confidence (provenance review) are never judged: the
+        result is needs_review, naming the line, and nothing is concluded about it.
         """
-        return _result(await asyncio.to_thread(service.check_work, steps, domain, labels, question, notebook, learner))
+        return _result(await asyncio.to_thread(service.check_work, steps, domain, labels, question, notebook, learner,
+                                               provenance))
 
     @server.tool(title="Create a practice problem", annotations=SAVES, meta=ANSWER_TOOL)
     async def practice_problem(kind: Annotated[Literal[PRACTICE_KINDS], Field(description=(

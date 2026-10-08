@@ -13,3 +13,4 @@ dist/
 
 .devpost-hackathon-state.json
 *.env
+.tmp.driveupload/

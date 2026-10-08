@@ -10,13 +10,13 @@ from fractions import Fraction
 
 from . import __version__
 from .ir import InputError, canonical, digest, fields, require
-from .linear_ir import BACKEND, SCOPE, normalize, read_exact_json, tokens, unknowns_in
+from .linear_ir import BACKEND, SCOPE, normalize, read_exact_json, review_lines, tokens, unknowns_in, work_unknowns
 
 CLAIMS = {
     "solve": {"solve.unique", "solve.family", "solve.family_domain_undecided", "solve.no_solution",
               "solve.no_solution_in_domain"},
     "answer": {"answer.correct", "answer.incorrect"},
-    "work": {"work.all_steps_valid", "work.error_found"},
+    "work": {"work.all_steps_valid", "work.error_found", "work.needs_review"},
 }
 
 
@@ -237,9 +237,11 @@ def _verify_answer(checks, spec, claim, result):
 
 
 def _verify_work(checks, spec, claim, result):
-    names = unknowns_in([t for line in spec["steps"] for t in line])
+    held = review_lines(spec)  # derived from the bound input, never from the result
+    names = work_unknowns(spec)
     checks.add("unknowns", result["unknowns"] == names)
-    lines = [_Line(texts, names) for texts in spec["steps"]]
+    checks.add("review_lines", result.get("review_lines", []) == held)
+    lines = [_Line([] if i in held else texts, names) for i, texts in enumerate(spec["steps"])]
     require(len(result["lines"]) == len(lines), "INVALID_SCHEMA", "Line count mismatch")
     for index, (line, stated) in enumerate(zip(lines, result["lines"])):
         _reading(checks, line, stated["matrix"], stated["rhs"], index)
@@ -250,7 +252,11 @@ def _verify_work(checks, spec, claim, result):
     for index, step in enumerate(transitions):
         before, after = lines[index], lines[index + 1]
         checks.add("transition_order", (step["from"], step["to"]) == (index, index + 1))
-        if step["status"] == "vacuous":
+        if index in held or index + 1 in held:
+            # No witness may accompany a line nobody has confirmed, and no verdict may be implied.
+            checks.add("withheld_for_review", step["status"] == "needs_review" and set(step) == {"from", "to", "status"},
+                       step=index)
+        elif step["status"] == "vacuous":
             weights = _qs(step["combination"], len(before.rows))
             checks.add("previous_line_contradiction", not any(_combine(weights, before.rows))
                        and _dot(weights, before.rhs) != 0, step=index)
@@ -271,10 +277,13 @@ def _verify_work(checks, spec, claim, result):
         else:
             raise InputError("INVALID_SCHEMA", "Unknown transition status")
     checks.add("first_error", result["first_error"] == first)
-    checks.add("verdict", (claim == "work.error_found") == (first is not None))
-    for key, line in (("original_solution", lines[0]), ("final_solution", lines[-1])):
+    expected = "work.error_found" if first is not None else "work.needs_review" if held else "work.all_steps_valid"
+    checks.add("verdict", claim == expected)
+    for key, index in (("original_solution", 0), ("final_solution", len(lines) - 1)):
         if key in result:
-            _unique(checks, line, result[key], 0 if key == "original_solution" else len(lines) - 1)
+            checks.add("solution_line_checked", index not in held, line=index)
+            if index not in held:
+                _unique(checks, lines[index], result[key], index)
 
 
 VERIFY = {"solve": _verify_solve, "answer": _verify_answer, "work": _verify_work}

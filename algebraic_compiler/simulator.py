@@ -49,6 +49,12 @@ SCENARIOS = [
     {"id": "work", "label": "Check Maya's homework",
      "utterance": "Alexa, check Maya's homework. The problem is 3x + 5 = 20. She wrote 3x = 25, then x = 25 over 3.",
      "tool": "check_work", "arguments": {"steps": [["3x + 5 = 20"], ["3x = 25"], ["x = 25/3"]]}},
+    {"id": "review", "label": "A line I can't read",
+     "utterance": "Alexa, check Maya's homework. The problem is 3x + 5 = 20. Her second line looks like 3x equals 1-S, "
+                  "I can't tell if that's a 5, and then she wrote x = 5.",
+     "tool": "check_work", "arguments": {
+         "steps": [["3x + 5 = 20"], ["3x = 15"], ["x = 5"]],
+         "provenance": [None, {"raw": "3x = 1S", "review": {"reason": "AMBIGUOUS_SYMBOL", "note": "5 or S?"}}, None]}},
     {"id": "tickets", "label": "A worksheet with a typo",
      "utterance": "Alexa, adult tickets cost $12 and child tickets cost $7. They sold 20 tickets for $300. How many child tickets?",
      "tool": "solve_equations", "arguments": {"equations": ["a + c = 20", "12a + 7c = 300"], "domain": "nonnegative_integer",

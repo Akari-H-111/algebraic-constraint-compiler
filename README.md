@@ -167,7 +167,7 @@ publish the Streamable HTTP endpoint (`--host 0.0.0.0`; set
 
 | Tool | What it certifies | Card |
 |---|---|---|
-| `check_work` | First line of work that changes the answer (counterexample), or that every step follows | ✓ |
+| `check_work` | First line of work that changes the answer (counterexample), or that every step follows. Lines the reader is unsure of are held for review, not judged ([details](#handwriting-and-the-review-state)) | ✓ |
 | `check_answer` | A proposed answer by exact substitution, plus uniqueness when it holds | ✓ |
 | `solve_equations` | One solution, infinitely many (complete family), no solution, or no valid answer in the domain | ✓ |
 | `practice_problem` | A fresh exercise with a pre-verified, hidden answer key | ✓ |
@@ -178,10 +178,47 @@ publish the Streamable HTTP endpoint (`--host 0.0.0.0`; set
 
 Prompts: `homework_helper`, `word_problem`, `weekly_progress`, `reconstruction_workflow`.
 
+## Handwriting and the review state
+
+`check_work` can keep each line of work tied to where it came from, and it never
+judges a line nobody has confirmed. This came from a viewer's comment on the demo
+video, which asked for source spans and a review state for steps that cannot be parsed.
+
+Pass an optional `provenance` list with one entry (or `null`) per line:
+
+```json
+{"steps": [["3x + 5 = 20"], ["3x = 15"], ["x = 5"]],
+ "provenance": [null,
+   {"source": {"kind": "region", "page": 1, "box": [40, 210, 520, 262]},
+    "raw": "3x = 1S",
+    "review": {"reason": "AMBIGUOUS_SYMBOL", "note": "5 or S?"}},
+   null]}
+```
+
+- `source` is a whole-number region (`page`, `box`) or text range (`start`, `end`);
+  `raw` is the text as the host read it. Both travel in the certificate input, so the
+  first certified wrong step comes back with `view.focus` pointing at the exact
+  region to highlight.
+- `review` marks a line the host is not sure about. The reasons are `AMBIGUOUS_SYMBOL`,
+  `AMBIGUOUS_GROUPING`, `ILLEGIBLE`, `UNPARSEABLE` and `OTHER`. A line that cannot be
+  parsed as an equation at all is held automatically with `UNPARSEABLE`.
+- A held line is never read. Each transition that touches it is `needs_review` and
+  carries no witness. Steps elsewhere are still certified, a certified wrong step
+  still stands (and says when an earlier line is unresolved), and the overall claim
+  is `work.needs_review` with status `NEEDS_REVIEW`: not a success, not a rejection,
+  not saved to the notebook. The verifier derives the held lines from the bound input,
+  so a held line cannot be relabelled "all steps valid".
+
+What this is not: the compiler does no handwriting recognition and does not look at
+images. The host model reads the page; Show Your Work only records where each line was,
+refuses to guess when the host is unsure, and certifies the algebra of what was confirmed.
+Spans are bound by the input digest but are not themselves verified. Nonlinear lines,
+division by zero and size limits keep their own statuses and still stop the run.
+
 ## Evidence
 
 ```bash
-.venv/bin/python -B -m unittest discover -s tests -p 'test*.py' -v   # 76 tests
+.venv/bin/python -B -m unittest discover -s tests -p 'test*.py' -v   # 96 tests
 python3 -B -m unittest discover -s tests -p 'test*.py'               # core on Python 3.9 (HTTP tests skip)
 ```
 

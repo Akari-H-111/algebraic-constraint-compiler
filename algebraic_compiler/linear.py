@@ -22,8 +22,8 @@ import time
 
 from . import __version__
 from .ir import InputError, canonical, digest, require
-from .linear_ir import (BACKEND, SCOPE, Reading, exact_json, normalize, read_exact_json, tokens,
-                        unknowns_in)
+from .linear_ir import (BACKEND, MAX_NOTE, MAX_TEXT, SCOPE, Reading, exact_json, normalize, normalize_text, read_exact_json,
+                        review_lines, tokens, unknowns_in, work_unknowns)
 
 LOG = logging.getLogger(__name__)
 NEGATIVE_CLAIMS = {"solve.no_solution", "solve.no_solution_in_domain", "answer.incorrect", "work.error_found"}
@@ -323,10 +323,15 @@ def _hint(before, after, names):
 
 
 def _work(spec):
-    names = unknowns_in([text for line in spec["steps"] for text in line])
-    readings = [read_line(line, names) for line in spec["steps"]]
+    held = set(review_lines(spec))
+    names = work_unknowns(spec)
+    readings = [read_line([] if i in held else line, names) for i, line in enumerate(spec["steps"])]
     transitions, first_error = [], None
     for index, (before, after) in enumerate(zip(readings, readings[1:])):
+        if index in held or index + 1 in held:
+            # Nothing is claimed either way: a person must confirm the line first.
+            transitions.append({"from": index, "to": index + 1, "status": "needs_review"})
+            continue
         step = {"from": index, "to": index + 1, **_transition(before, after)}
         if step["status"] == "breaks":
             hint = _hint(before, after, names)
@@ -335,16 +340,17 @@ def _work(spec):
             if first_error is None:
                 first_error = index
         transitions.append(step)
-    original = _analyze(readings[0].rows, readings[0].rhs)
-    final = _analyze(readings[-1].rows, readings[-1].rhs)
     result = {"unknowns": names, "lines": [{"matrix": _matrix(r.rows), "rhs": _vec(r.rhs)} for r in readings],
               "transitions": transitions, "first_error": first_error, "domain": spec["domain"]}
-    if original["kind"] == "unique":
-        result["original_solution"] = {"solution": _vec(original["solution"]),
-                                       "derivations": _matrix(original["derivations"])}
-    if final["kind"] == "unique":
-        result["final_solution"] = {"solution": _vec(final["solution"]), "derivations": _matrix(final["derivations"])}
-    return ("work.error_found" if first_error is not None else "work.all_steps_valid"), result
+    if held:
+        result["review_lines"] = sorted(held)
+    for key, index in (("original_solution", 0), ("final_solution", len(readings) - 1)):
+        found = _analyze(readings[index].rows, readings[index].rhs) if index not in held else None
+        if found and found["kind"] == "unique":
+            result[key] = {"solution": _vec(found["solution"]), "derivations": _matrix(found["derivations"])}
+    claim = ("work.error_found" if first_error is not None else
+             "work.needs_review" if held else "work.all_steps_valid")
+    return claim, result
 
 
 TASKS = {"solve": _solve, "answer": _answer, "work": _work}
@@ -354,6 +360,38 @@ def certificate(spec_sha, task, claim, result):
     cert = {"schema_version": "1", "compiler_version": __version__, "backend_id": BACKEND, "scope": SCOPE,
             "task": task, "input_sha256": spec_sha, "claim": claim, "result": result}
     return {**cert, "certificate_sha256": digest(cert)}
+
+
+def _hold_unreadable(raw):
+    """Work only: a line that cannot be read as an equation goes to review instead of failing the run.
+
+    Only plain misreadings (INVALID_EQUATION) are held. Nonlinear input, division by zero, size limits
+    and malformed shapes keep their own distinct statuses and still stop the whole run.
+    """
+    steps = raw.get("steps") if type(raw) is dict else None
+    if type(steps) is not list or not steps or raw.get("task", "work") != "work":
+        return raw
+    notes = raw.get("provenance")
+    notes = [None] * len(steps) if notes is None else notes
+    if type(notes) is not list or len(notes) != len(steps):
+        return raw  # normalize() reports the shape problem
+    steps, notes, changed = list(steps), list(notes), False
+    for index, line in enumerate(steps):
+        texts = [line] if type(line) is str else line
+        if (type(notes[index]) is dict and "review" in notes[index]) or type(texts) is not list or not texts \
+                or not all(type(text) is str for text in texts):
+            continue
+        try:
+            for text in texts:
+                _Reader(normalize_text(text)).equation()
+        except InputError as exc:
+            if exc.code != "INVALID_EQUATION":
+                continue
+            note = dict(notes[index]) if type(notes[index]) is dict else {}
+            note.setdefault("raw", " ".join(" ; ".join(texts).split())[:MAX_TEXT])
+            note["review"] = {"reason": "UNPARSEABLE", "note": str(exc)[:MAX_NOTE]}
+            steps[index], notes[index], changed = [], note, True
+    return {**raw, "steps": steps, "provenance": notes} if changed else raw
 
 
 def run(raw):
@@ -368,7 +406,7 @@ def run(raw):
     output = {"schema_version": "1", "status": "ASSUMPTION_REQUIRED", "certificate_verified": False,
               "claim": None, "code": None, "bundle": None}
     try:
-        spec, sha = normalize(raw)
+        spec, sha = normalize(_hold_unreadable(raw))
         claim, result = TASKS[spec["task"]](spec)
         bundle = {"schema_version": "1", "format": "show-your-work/bundle", "input": spec,
                   "certificate": certificate(sha, spec["task"], claim, result)}
@@ -377,10 +415,11 @@ def run(raw):
         if not report["certificate_verified"]:
             output.update(status="INFRASTRUCTURE_ERROR", code="CERTIFICATE_VERIFICATION_FAILED", verification=report)
             return output
-        undecided = claim.endswith("domain_undecided")
-        output.update(status="MATHEMATICALLY_REJECTED" if claim in NEGATIVE_CLAIMS else "VERIFIED",
+        undecided, held = claim.endswith("domain_undecided"), claim == "work.needs_review"
+        output.update(status="NEEDS_REVIEW" if held else
+                      "MATHEMATICALLY_REJECTED" if claim in NEGATIVE_CLAIMS else "VERIFIED",
                       certificate_verified=True, claim=claim, input_sha256=sha, bundle=bundle,
-                      code="DOMAIN_NOT_DECIDED" if undecided else None)
+                      code="DOMAIN_NOT_DECIDED" if undecided else "REVIEW_REQUIRED" if held else None)
         return output
     except InputError as exc:
         status = ("INCOMPLETE_RESOURCE_LIMIT" if exc.code == "RESOURCE_LIMIT" else

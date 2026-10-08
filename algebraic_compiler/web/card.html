@@ -124,19 +124,21 @@ pre{font-family:var(--mono);font-size:.72em;max-height:220px;overflow:auto;backg
 
   const chipText = {
     unique_solution:'✓ Verified answer', correct:'✓ Correct · verified', all_steps_valid:'✓ Every step verified',
-    error_found:'Mistake found · certified', incorrect:'Not quite · certified', no_solution:'No solution · certified',
+    error_found:'Mistake found · certified', needs_review:'Needs your confirmation · nothing concluded', incorrect:'Not quite · certified', no_solution:'No solution · certified',
     no_valid_answer:'No valid answer · certified', infinitely_many:'Many solutions · certified', practice:'Practice · key verified',
     progress:'Notebook · re-verified', history:'Notebook', verified:'✓ Replay verified', rejected:'✗ Replay rejected',
     forgery_rejected:'✓ Forgery rejected', no_claim:'No claim made'
   };
 
-  function seal(tone){
+  function seal(tone, verdict){
     const color = {success:'var(--ok)', warning:'var(--warn)', danger:'var(--bad)'}[tone] || 'var(--info)';
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 40 40'); svg.setAttribute('class', 'seal'); svg.setAttribute('aria-hidden', 'true');
     svg.innerHTML = '<circle cx="20" cy="20" r="17" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-dasharray="4 2.5"/>' +
       '<circle cx="20" cy="20" r="11" fill="' + color + '" opacity=".16"/>' +
-      '<path d="M14 20.5l4 4 8-9" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+      (verdict === 'needs_review'
+        ? '<text x="20" y="27" text-anchor="middle" font-size="20" font-weight="700" fill="' + color + '">?</text>'
+        : '<path d="M14 20.5l4 4 8-9" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>');
     return svg;
   }
 
@@ -148,7 +150,7 @@ pre{font-family:var(--mono);font-size:.72em;max-height:220px;overflow:auto;backg
     const root = document.getElementById('root');
     root.className = 'card tone-' + tone;
     root.replaceChildren();
-    root.append($('div', {class:'top'}, seal(tone), $('span', {class:'chip'}, chipText[v.verdict] || v.verdict), $('span', {class:'brand'}, 'Show Your Work · exact over ℚ')));
+    root.append($('div', {class:'top'}, seal(tone, v.verdict), $('span', {class:'chip'}, chipText[v.verdict] || v.verdict), $('span', {class:'brand'}, 'Show Your Work · exact over ℚ')));
     root.append($('h1', {}, v.title || ''));
     if (v.detail) root.append($('p', {class:'say'}, v.detail));
     const main = $('div', {}), side = $('div', {});
@@ -217,7 +219,7 @@ pre{font-family:var(--mono);font-size:.72em;max-height:220px;overflow:auto;backg
   async function start(){
     if (!inHost) { showEmpty('This is an MCP Apps view. Open it inside an MCP Apps host (Claude, ChatGPT, VS Code, Goose, or the Show Your Work Alexa+ simulator).'); return; }
     try {
-      const init = await request('ui/initialize', {appInfo:{name:'show-your-work-card', version:'0.3.4'},
+      const init = await request('ui/initialize', {appInfo:{name:'show-your-work-card', version:'0.4.0'},
         appCapabilities:{availableDisplayModes:['inline']}, protocolVersion:'2026-01-26'});
       applyContext((init && init.hostContext) || {});
       notify('ui/notifications/initialized', {});

@@ -161,7 +161,8 @@ class SimulatorHTTPTests(unittest.TestCase):
             self.assertEqual(len(tool_events), 1)
             verdicts[scenario["id"]] = tool_events[0]["verdict"]
             self.assertTrue(data["reply"])
-        self.assertEqual(verdicts, {"work": "error_found", "tickets": "no_valid_answer", "practice": "practice",
+        self.assertEqual(verdicts, {"work": "error_found", "review": "needs_review", "tickets": "no_valid_answer",
+                                    "practice": "practice",
                                     "answer": "correct", "system": "unique_solution", "progress": "progress"})
 
     def test_app_only_tools_resources_and_free_speech_without_model(self):

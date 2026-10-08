@@ -91,6 +91,22 @@ class ShowYourWorkMCPTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("reveal_only_if_asked=Verified answer: x = 5", work.content[0].text)
                 self.assertEqual(payload["saved"]["learner"], "maya")
 
+                self.assertIn("provenance", tools["check_work"].inputSchema["properties"])
+                region = {"kind": "region", "page": 1, "box": [40, 210, 520, 262]}
+                pending = await client.call_tool("check_work", {
+                    "steps": [["3x + 5 = 20"], ["3x = 15"], ["x = 5"]], "notebook": "test family", "learner": "Maya",
+                    "provenance": [None, {"source": region, "raw": "3x = 1S",
+                                          "review": {"reason": "AMBIGUOUS_SYMBOL", "note": "5 or S"}}, None]})
+                self.assertFalse(pending.isError)
+                held = pending.structuredContent
+                self.assertEqual((held["status"], held["verdict"], held["claim"]),
+                                 ("NEEDS_REVIEW", "needs_review", "work.needs_review"))
+                self.assertTrue(held["certificate_verified"])
+                self.assertIsNone(held["saved"])
+                self.assertEqual(held["view"]["focus"]["source"], region)
+                self.assertIn("next=ask the person", pending.content[0].text)
+                self.assertTrue(verify_bundle(held["bundle"])["certificate_verified"])
+
                 forged = await client.call_tool("forgery_check", {"bundle": payload["bundle"]})
                 self.assertEqual(forged.structuredContent["verdict"], "forgery_rejected")
                 replay = await client.call_tool("verify_certificate", {"bundle": payload["bundle"]})

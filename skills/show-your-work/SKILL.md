@@ -25,6 +25,8 @@ Apps card `ui://show-your-work/certificate-card.html`.
    Keep the person's wording in `question` so the card can show it back.
 2. **Pick the tool.**
    - A student's lines of work → `check_work` (first line = the original problem).
+     If you read the work from a photo or handwriting and are unsure of a line, do not
+     guess: add a `provenance` note with `review` (and `source`/`raw` if you know them).
    - A final answer only → `check_answer`.
    - "What is the answer?" → `solve_equations`.
    - "Give me one like that" → `practice_problem` (do not read the key aloud).
@@ -43,4 +45,6 @@ Apps card `ui://show-your-work/certificate-card.html`.
   an error, say nothing was verified. Never substitute your own number.
 - Hints about the *kind* of slip are rule-based guesses and are labelled as
   not certified. The step that breaks is certified.
+- `NEEDS_REVIEW` (`work.needs_review`) is neither right nor wrong: name the flagged line, ask what it
+  says, then call `check_work` again with the confirmed text. Do not pick a reading yourself.
 - Ask the person to check the typed equations: translation is the only AI step.
