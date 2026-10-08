@@ -1,9 +1,11 @@
 """Simulated Alexa+ host: guided mode over real HTTP, a scripted agent loop, and provider helpers."""
 
+import ast
 import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import socket
 import subprocess
 import sys
@@ -21,6 +23,19 @@ from algebraic_compiler import llm, simulator
 from algebraic_compiler.llm import Call, simplify_schema, sigv4
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class StaticDemoTests(unittest.TestCase):
+    def test_static_backend_forwards_every_service_parameter(self):
+        """The in-browser demo keeps its own argument whitelist; a parameter missing there is silently dropped."""
+        js = (ROOT / "tools" / "site" / "static-backend.js").read_text()
+        functions = dict(re.findall(r"'(\w+)': service\.(\w+)(?=\s*[,}])", js))
+        listed = {tool: re.findall(r"'(\w+)'", args) for tool, args in re.findall(r"'(\w+)': \(([^)]*)\)", js)}
+        tree = ast.parse((ROOT / "algebraic_compiler" / "service.py").read_text())
+        params = {n.name: [a.arg for a in n.args.args] for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+        self.assertEqual(set(functions), set(listed))
+        for tool, function in functions.items():
+            self.assertEqual(sorted(listed[tool]), sorted(params[function]), tool)
 
 
 class ProviderHelperTests(unittest.TestCase):
