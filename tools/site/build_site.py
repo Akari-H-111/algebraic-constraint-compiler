@@ -52,6 +52,7 @@ def main():
     (out / "alexa.css").write_text(css)
     shutil.copy2(web / "alexa.js", out / "alexa.js")
     shutil.copytree(web / "voice", out / "voice")  # recorded Gemini TTS clips and their manifest
+    shutil.copy2(ROOT / "docs/images/social-preview.png", out / "social-preview.png")  # the page's og:image (1280x640)
     shutil.copy2(ROOT / "tools/site/static-backend.js", out / "static-backend.js")
     for name in ENGINE:
         shutil.copy2(ROOT / "algebraic_compiler" / name, out / "engine/algebraic_compiler" / name)

@@ -60,5 +60,10 @@ def synthesize(text, key, voice=DEFAULT_VOICE, model=DEFAULT_MODEL, timeout=60, 
     rate = 24000
     for piece in str(part.get("mimeType", "")).split(";"):
         if piece.strip().startswith("rate="):
-            rate = int(piece.split("=", 1)[1])
+            try:
+                rate = int(piece.split("=", 1)[1])
+            except ValueError:
+                raise TTSError("Gemini TTS returned audio in a format this display cannot read") from None
+    if not 8000 <= rate <= 192000:
+        raise TTSError("Gemini TTS returned audio in a format this display cannot read")
     return wav_from_pcm(pcm, rate), len(pcm) / 2 / rate

@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -44,7 +45,11 @@ def engine():
     """
     from algebraic_compiler import notebook
     js = (ROOT / "tools/site/static-backend.js").read_text()
-    code = re.search(r"py\.runPython\(`\n(.*?)`\);", js, re.S).group(1)
+    block = re.search(r"py\.runPython\(`\n(.*?)`\);", js, re.S)
+    if block is None:
+        raise RuntimeError("tools/site/static-backend.js no longer has a py.runPython(`...`) block; "
+                           "update engine() in make_voice.py to read the web demo's Python glue from its new place")
+    code = block.group(1)
     path = str(Path(tempfile.mkdtemp(prefix="syw-voice-")) / "notebook.sqlite3")
     os.environ["SYW_NOTEBOOK_PATH"] = path
     notebook.reset_shared(path)
@@ -94,6 +99,14 @@ def speak(text, key, voice, models):
     raise SystemExit("Gemini TTS failed for every model tried (" + str(last) + ")")
 
 
+def find_ffmpeg(explicit=None):
+    """--ffmpeg PATH, else ffmpeg on PATH, else the copy kept under the git-ignored .local-qa."""
+    for candidate in (explicit, shutil.which("ffmpeg"), str(FFMPEG)):
+        if candidate and Path(candidate).is_file():
+            return Path(candidate)
+    raise SystemExit("ffmpeg was not found: install it (it must be on PATH) or pass --ffmpeg PATH")
+
+
 def encode(wav, ffmpeg, path):
     with tempfile.TemporaryDirectory() as tmp:
         source = Path(tmp) / "clip.wav"
@@ -106,7 +119,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", help="Use only this Gemini TTS model (default: 3.1 flash, then 2.5 flash)")
     parser.add_argument("--voice", default=tts.DEFAULT_VOICE)
-    parser.add_argument("--ffmpeg", default=str(FFMPEG))
+    parser.add_argument("--ffmpeg", help="Path to ffmpeg (default: ffmpeg on PATH)")
     parser.add_argument("--only", help="Comma-separated scenario ids to (re)record; others keep their clips")
     args = parser.parse_args()
     load_env(str(ROOT / ".env"))
@@ -127,7 +140,7 @@ def main():
             print(f"keep   {ident}")
             continue
         wav, seconds, model = speak(text, key, args.voice, [args.model] if args.model else MODELS)
-        encode(wav, Path(args.ffmpeg), OUT / f"{ident}.mp3")
+        encode(wav, find_ffmpeg(args.ffmpeg), OUT / f"{ident}.mp3")
         clips[digest] = {"id": ident, "file": f"{ident}.mp3", "model": model, "seconds": round(seconds, 1),
                          "text_sha256": digest, "recorded": time.strftime("%Y-%m-%d")}
         print(f"record {ident}: {seconds:.1f}s with {model}")

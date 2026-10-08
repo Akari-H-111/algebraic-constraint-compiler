@@ -49,7 +49,9 @@
   const VOICE_BASE = 'voice/';
   const AUDIO_START_MS = 8000;  // audio that has not begun to play by then is given up on, so a stalled file cannot hold the page
   let recorded = null, speaking = null, speechTurn = 0;
-  const loadRecorded = () => recorded || (recorded = fetch(VOICE_BASE + 'manifest.json').then(r => r.ok ? r.json() : null).catch(() => null));
+  // A failed fetch is not remembered, so the next reply tries the manifest again.
+  const loadRecorded = () => recorded || (recorded = fetch(VOICE_BASE + 'manifest.json').then(r => r.ok ? r.json() : null).catch(() => null)
+    .then(manifest => { if (!manifest) recorded = null; return manifest; }));
   async function sha256Hex(text) {
     if (!(window.crypto && crypto.subtle)) return null;
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -71,7 +73,11 @@
                 note: 'Synthesised just now from the text on the screen.'};
       } catch (error) { logEvent({type: 'notice', text: 'Gemini voice unavailable, using the browser voice: ' + error.message}); }
     }
-    return null;
+    // No audio to play: say why, so the timeline does not claim there was simply no matching clip.
+    const why = !manifest ? 'The list of recorded clips could not be loaded, and live Gemini voice is not available here.'
+      : !hash ? 'This page cannot fingerprint the text (that needs HTTPS or localhost), so recorded clips cannot be matched, and live Gemini voice is not available here.'
+      : 'No recorded Gemini clip matches this text and live Gemini voice is not available here.';
+    return {why};
   }
   // Resolves {ok: true} when the audio played to its end or was stopped, and {ok: false, why} when it could not play.
   function playAudio(choice, started) {
@@ -130,14 +136,14 @@
     try {
       const choice = await chooseVoice(text);
       if (!current()) return;
-      let why = 'No recorded Gemini clip matches this text and live Gemini voice is not available here.';
-      if (choice) {
+      let why = choice.why;
+      if (choice.url) {
         const played = await playAudio(choice, () => { if (current()) logEvent({type: 'voice', label: choice.label, note: choice.note}); });
         if (!current() || played.ok) return;
         why = `${choice.kind} ${played.why}.`;
       }
       if (!window.speechSynthesis) { logEvent({type: 'voice', label: 'No voice available', note: why + ' This browser has no speech synthesis, so nothing was spoken.'}); return; }
-      logEvent({type: 'voice', label: 'Browser voice (speechSynthesis)', note: choice ? why + ' The browser voice was used instead.' : why});
+      logEvent({type: 'voice', label: 'Browser voice (speechSynthesis)', note: choice.url ? why + ' The browser voice was used instead.' : why});
       await browserVoice(text);
     } finally { if (current() && stateName === 'speaking') setState(''); }
   }

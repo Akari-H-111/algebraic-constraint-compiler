@@ -34,7 +34,8 @@ button,input{font:inherit}
 #clock,.household{white-space:nowrap}
 .idle{margin:auto 0;padding:0 6px}
 .idle-slot{min-height:92px;margin-top:18px}
-.boot-note{margin:0;color:var(--muted);font-size:14px}.greeting{font-size:clamp(28px,4vw,52px);font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
+.boot-note{margin:0;color:var(--muted);font-size:14px}
+.greeting{font-size:clamp(28px,4vw,52px);font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
 .prompt{font-size:clamp(17px,2vw,24px);color:#cfd7ea;margin:0 0 6px}
 .sub{color:var(--muted);margin:0}
 .conversation{margin:10px 0 8px}

@@ -64,6 +64,11 @@ class RecordedVoiceTests(unittest.TestCase):
             self.assertEqual((clip["id"], clip["text_sha256"]), (ident, digest))
             self.assertGreater((voice / clip["file"]).stat().st_size, 5000)
         self.assertEqual(len(manifest["clips"]), len(texts))
+        # ffmpeg is looked up explicitly, then on PATH, then in the local tools folder; a clear error when absent.
+        self.assertEqual(make_voice.find_ffmpeg(__file__), Path(__file__))
+        with mock.patch.object(make_voice, "FFMPEG", Path("/nonexistent/ffmpeg")), mock.patch.object(make_voice.shutil, "which", return_value=None):
+            with self.assertRaises(SystemExit):
+                make_voice.find_ffmpeg()
 
 
 class GeminiVoiceTests(unittest.TestCase):
@@ -104,6 +109,10 @@ class GeminiVoiceTests(unittest.TestCase):
             tts.synthesize("hello", "k", opener=lambda request, timeout: self.Reply({"candidates": []}))
         with self.assertRaises(tts.TTSError):
             tts.synthesize("x" * (tts.MAX_CHARS + 1), "k")
+        for mime in ("audio/L16;codec=pcm;rate=0", "audio/L16;codec=pcm;rate=abc"):  # an unreadable sample rate is an error, not a crash
+            bad = {"candidates": [{"content": {"parts": [{"inlineData": {"mimeType": mime, "data": "AAA="}}]}}]}
+            with self.assertRaises(tts.TTSError):
+                tts.synthesize("hello", "k", opener=lambda request, timeout, bad=bad: self.Reply(bad))
 
 
 class ProviderHelperTests(unittest.TestCase):
