@@ -35,6 +35,22 @@ def wav_seconds(path):
         return w.getnframes() / w.getframerate()
 
 
+
+def speech_bounds(path, threshold=0.02):
+    """Seconds (start, end) of the audible part of a 16-bit WAV, ignoring leading and trailing silence."""
+    with wave.open(str(path)) as w:
+        rate, width, channels, raw = w.getframerate(), w.getsampwidth(), w.getnchannels(), w.readframes(w.getnframes())
+    if width != 2:
+        return 0.0, len(raw) / (rate * width * channels)
+    import array
+    samples = array.array("h", raw)[::channels]
+    window = max(1, rate // 50)  # 20 ms
+    limit = int(32767 * threshold)
+    loud = [i for i in range(0, len(samples), window) if max(abs(x) for x in samples[i:i + window]) > limit]
+    if not loud:
+        return 0.0, len(samples) / rate
+    return loud[0] / rate, min(len(samples), loud[-1] + window) / rate
+
 def stamp(t):
     ms = int(round(t * 1000))
     return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
@@ -138,9 +154,18 @@ def main():
             if audio:
                 audio_inputs.append((audio, t + start))
             lines = chunks(caption)
-            for i, line in enumerate(lines):
-                a = t + start + i * span / len(lines)
-                srt.append((a, a + span / len(lines) - 0.05, line))
+            if not lines:
+                continue
+            begin, end = 0.0, span
+            if audio:  # captions follow the audible speech, not the clip's silent edges
+                rate = tempo if "narration" in audio.parts else args.reply_tempo
+                begin, end = (x / rate for x in speech_bounds(audio))
+            weights = [len(line) + 8 for line in lines]  # time per line follows its length
+            cursor_line = t + start + begin
+            for line, weight in zip(lines, weights):
+                share = (end - begin) * weight / sum(weights)
+                srt.append((cursor_line, cursor_line + share - 0.05, line))
+                cursor_line += share
         t += length
     listing = work / "clips.txt"
     listing.write_text("".join(f"file '{c.resolve()}'\n" for c in clips))

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/MAS9ZeFuNRg"><b>▶ Demo video (2:54)</b></a> ·
+  <a href="https://youtu.be/UqhkX22D0FI"><b>▶ Demo video (2:49)</b></a> ·
   <a href="https://akari-h-111.github.io/algebraic-constraint-compiler/"><b>Try it in your browser</b></a> ·
   <a href="#use-it-from-any-mcp-host"><b>Public MCP endpoint</b></a> ·
   <a href="https://devpost.com/software/algebraic-constraint-compiler"><b>Devpost</b></a>
