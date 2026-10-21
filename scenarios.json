@@ -19,6 +19,72 @@
   }
  },
  {
+  "id": "photo",
+  "label": "Check a photo of the page",
+  "utterance": "Alexa, here is Maya's homework page. Can you check it?",
+  "photo": "samples/maya-homework.jpg",
+  "tool": "check_work",
+  "arguments": {
+   "steps": [
+    [
+     "3x + 5 = 20"
+    ],
+    [
+     "3x = 25"
+    ],
+    [
+     "x = 25/3"
+    ]
+   ],
+   "provenance": [
+    {
+     "source": {
+      "kind": "region",
+      "page": 1,
+      "box": [
+       190,
+       270,
+       420,
+       300
+      ]
+     },
+     "raw": "3x + 5 = 20"
+    },
+    {
+     "source": {
+      "kind": "region",
+      "page": 1,
+      "box": [
+       190,
+       330,
+       350,
+       360
+      ]
+     },
+     "raw": "3x = 25"
+    },
+    {
+     "source": {
+      "kind": "region",
+      "page": 1,
+      "box": [
+       190,
+       390,
+       380,
+       420
+      ]
+     },
+     "raw": "x = 25/3"
+    }
+   ]
+  },
+  "reading": {
+   "model": "gemini-2.5-flash",
+   "date": "2026-10-21",
+   "recorded": true
+  }
+ },
+ {
   "id": "review",
   "label": "A line I can't read",
   "utterance": "Alexa, check Maya's homework. The problem is 3x + 5 = 20. Her second line looks like 3x equals 1-S, I can't tell if that's a 5, and then she wrote x = 5.",
@@ -46,6 +112,77 @@
     },
     null
    ]
+  }
+ },
+ {
+  "id": "photo-review",
+  "label": "A photo with a line I can't read",
+  "utterance": "Alexa, here is Maya's homework page. I can't tell if her second line ends in a 5 or an S.",
+  "photo": "samples/maya-homework-unclear.jpg",
+  "guided_only": true,
+  "tool": "check_work",
+  "arguments": {
+   "steps": [
+    [
+     "3x + 5 = 20"
+    ],
+    [
+     "3x = 15"
+    ],
+    [
+     "x = 5"
+    ]
+   ],
+   "provenance": [
+    {
+     "source": {
+      "kind": "region",
+      "page": 1,
+      "box": [
+       195,
+       226,
+       418,
+       280
+      ]
+     },
+     "raw": "3x + 5 = 20"
+    },
+    {
+     "source": {
+      "kind": "region",
+      "page": 1,
+      "box": [
+       190,
+       323,
+       349,
+       378
+      ]
+     },
+     "raw": "3x = 1S",
+     "review": {
+      "reason": "AMBIGUOUS_SYMBOL",
+      "note": "5 or S?"
+     }
+    },
+    {
+     "source": {
+      "kind": "region",
+      "page": 1,
+      "box": [
+       201,
+       406,
+       307,
+       457
+      ]
+     },
+     "raw": "x = 5"
+    }
+   ]
+  },
+  "reading": {
+   "model": null,
+   "date": "2026-10-21",
+   "recorded": false
   }
  },
  {
