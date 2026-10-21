@@ -73,6 +73,8 @@ def replies():
             call = engine()
             text = spoken(call, scenario)
             assert text == spoken(engine(), scenario), f"{scenario['id']}: the spoken reply is not stable"
+            if text in found.values():  # e.g. the photo of Maya's work says what the typed request says: one clip serves both
+                continue
             found[scenario["id"]] = text
     for ident, before in PROGRESS_STATES:
         call = engine()

@@ -1,11 +1,16 @@
 """Assemble recorded scene frames into the demo video with captions and optional narration.
 
-    python3 tools/video/build.py <frames_dir> <out.mp4> [--burn] [--ffmpeg PATH]
+    python3 tools/video/build.py <frames_dir> <out.mp4> [--burn] [--ffmpeg PATH] [--estimate]
 
 Scenes come from <frames_dir>/scenes.json (written by record.mjs). If
 <frames_dir>/narration/<scene>.wav exists, it is placed at the scene start and
 the scene's last frame is held when the narration runs longer. Captions are
 written next to the video as .srt; --burn also renders them into the picture.
+
+--estimate builds a silent timing draft: where a clip has no wav, its length is
+estimated from the words (narration --wps, Alexa replies --reply-wps or a fixed
+--reply-seconds), so scenes get the hold and captions they will have in the
+final cut. A per-scene timing table is printed and written to <out>.timing.json.
 """
 
 import argparse
@@ -56,18 +61,24 @@ def main():
     parser.add_argument("--burn", action="store_true")
     parser.add_argument("--ffmpeg", default=str(DEFAULT_FFMPEG))
     parser.add_argument("--tempo", type=float, default=1.0, help="Speed factor for narration clips (e.g. 1.05)")
+    parser.add_argument("--reply-tempo", type=float, default=1.0, help="Speed factor for Alexa reply clips (e.g. 1.1)")
+    parser.add_argument("--trim-tail", action="store_true", help="End each narrated scene 0.45 s after its last voice instead of keeping idle recorded frames")
     parser.add_argument("--first", type=float, default=None, help="Override the first scene's length (title card)")
+    parser.add_argument("--estimate", action="store_true", help="Silent timing draft: estimate clip lengths from the words")
+    parser.add_argument("--wps", type=float, default=2.55, help="Estimate: narration words per second at the final tempo")
+    parser.add_argument("--reply-wps", type=float, default=2.3, help="Estimate: Alexa reply words per second (Kore, tempo 1.0)")
+    parser.add_argument("--reply-seconds", type=float, default=None, help="Estimate: fixed seconds per Alexa reply instead of --reply-wps")
     args = parser.parse_args()
     frames, out, ff = Path(args.frames), Path(args.out), args.ffmpeg
     tempo = args.tempo
-    spoken = lambda path: wav_seconds(path) / (tempo if "narration" in path.parts else 1.0)
+    spoken = lambda path: wav_seconds(path) / (tempo if "narration" in path.parts else args.reply_tempo)
     meta = json.loads((frames / "scenes.json").read_text())
     text = json.loads((ROOT / "tools/video" / os.environ.get("NARRATION", "narration.json")).read_text())["scenes"]
     fps = meta["fps"]
     work = frames / "_build"
     shutil.rmtree(work, ignore_errors=True)
     work.mkdir()
-    clips, srt, audio_inputs, t = [], [], [], 0.0
+    clips, srt, audio_inputs, t, timing = [], [], [], 0.0, []
     chapters = []
     for number, scene in enumerate(meta["scenes"]):
         name, recorded = scene["name"], scene["seconds"]
@@ -80,25 +91,38 @@ def main():
             item["t"] = item["t"] - removed(item["t"])
         entry = text.get(name, "")
         parts = entry if isinstance(entry, dict) else {"post": entry}
-        cursor, placed = 0.3, []  # (start, path, caption) within the scene; voices never overlap
+        cursor, placed = 0.3, []  # (start, path, caption, seconds) within the scene; voices never overlap
+        words = lambda text: len(text.split())
+        narr_est = lambda text: words(text) / args.wps
+        reply_est = lambda text: args.reply_seconds if args.reply_seconds else max(1.5, words(text) / args.reply_wps)
         pre = frames / "narration" / f"{name}.pre.wav"
-        if pre.exists():
-            placed.append((cursor, pre, parts.get("pre", "")))
-            cursor += spoken(pre) + 0.25
+        if pre.exists() or (args.estimate and parts.get("pre")):
+            length_pre = spoken(pre) if pre.exists() else narr_est(parts["pre"])
+            placed.append((cursor, pre if pre.exists() else None, parts.get("pre", ""), length_pre))
+            cursor += length_pre + 0.25
         for i, item in enumerate(scene.get("speech", [])):
             clip = frames / "speech" / f"{name}-{i}.wav"
-            if clip.exists():
+            if clip.exists() or args.estimate:
                 start = max(cursor, item["t"] + 0.4)
-                placed.append((start, clip, "Alexa: " + item["text"]))
-                cursor = start + spoken(clip) + 0.3
+                if item.get("silent"):  # shown on screen only: time reserved, no audio, no caption
+                    length_reply = item["seconds"]
+                    placed.append((start, None, "", length_reply))
+                    cursor = start + length_reply + 0.3
+                    continue
+                length_reply = spoken(clip) if clip.exists() else reply_est(item["text"])
+                placed.append((start, clip if clip.exists() else None, "Alexa: " + item["text"], length_reply))
+                cursor = start + length_reply + 0.3
         post = frames / "narration" / f"{name}.wav"
-        if post.exists():
-            placed.append((cursor, post, parts.get("post", "")))
-            cursor += spoken(post)
+        if post.exists() or (args.estimate and parts.get("post")):
+            length_post = spoken(post) if post.exists() else narr_est(parts["post"])
+            placed.append((cursor, post if post.exists() else None, parts.get("post", ""), length_post))
+            cursor += length_post
         elif parts.get("post") and not placed:
-            placed.append((0.3, None, parts["post"]))  # silent draft: captions only
+            placed.append((0.3, None, parts["post"], seconds - 1.0))  # silent draft: captions only
             cursor = seconds
         length = max(seconds, cursor + 0.45)
+        if args.trim_tail and placed and not args.estimate:
+            length = min(length, max(cursor + 0.45, 1.0))
         clip_path = work / f"{name}.mp4"
         hold = max(0.0, length - seconds)
         keep = "".join(f"+between(t,{a:.2f},{b:.2f})" for a, b in cuts)
@@ -108,8 +132,9 @@ def main():
              "-t", f"{length:.3f}", "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-r", "30", clip_path])
         clips.append(clip_path)
         chapters.append((t, name))
-        for start, audio, caption in placed:
-            span = spoken(audio) if audio else (seconds - 1.0)
+        timing.append({"name": name, "recorded": round(seconds, 1), "narration": round(sum(p[3] for p in placed if p[2] and not p[2].startswith("Alexa: ")), 1),
+                       "replies": round(sum(p[3] for p in placed if not p[2] or p[2].startswith("Alexa: ")), 1), "final": round(length, 1)})
+        for start, audio, caption, span in placed:
             if audio:
                 audio_inputs.append((audio, t + start))
             lines = chunks(caption)
@@ -137,7 +162,8 @@ def main():
         parts = []
         for i, (_, start) in enumerate(audio_inputs, 1):  # _ is the clip path
             delay = int(start * 1000)
-            speed = f"atempo={tempo}," if tempo != 1.0 and "narration" in Path(str(_)).parts else ""
+            rate = tempo if "narration" in Path(str(_)).parts else args.reply_tempo
+            speed = f"atempo={rate}," if rate != 1.0 else ""
             filters.append(f"[{i}:a]{speed}aresample=48000,adelay={delay}|{delay}[a{i}]")
             parts.append(f"[a{i}]")
         filters.append("".join(parts) + f"amix=inputs={len(parts)}:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000,apad=whole_dur={t:.3f}[a]")
@@ -152,6 +178,11 @@ def main():
     titles = json.loads((ROOT / "tools/video" / os.environ.get("NARRATION", "narration.json")).read_text()).get("chapters", {})
     lines = [f"{int(a // 60)}:{int(a % 60):02d} {titles[n]}" for a, n in chapters if n in titles]
     out.with_suffix(".chapters.txt").write_text("\n".join(lines) + "\n")
+    out.with_suffix(".timing.json").write_text(json.dumps({"total": round(t, 1), "scenes": timing, "estimate": args.estimate}, indent=1))
+    if args.estimate:
+        print(f"{'scene':18}{'recorded':>9}{'narration':>10}{'replies':>9}{'final':>7}")
+        for row in timing:
+            print(f"{row['name']:18}{row['recorded']:9.1f}{row['narration']:10.1f}{row['replies']:9.1f}{row['final']:7.1f}")
     print(f"{out} ({t:.1f}s), captions {captions}")
 
 

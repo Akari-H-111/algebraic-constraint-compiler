@@ -20,22 +20,31 @@
 # Show Your Work
 
 Show Your Work is an MCP server plus a **simulated** Alexa+ smart display (not an
-Amazon product). It checks a child's math homework and never says "correct"
-unless an independent verifier has replayed an exact proof.
+Amazon product). Show it a photo of a child's math homework and it points to the exact
+line where the work goes wrong. It never says "correct" unless an independent verifier
+has replayed an exact proof.
 
-- **It finds the exact line** where the work goes wrong, with a counterexample you can check by hand.
+- **Show Alexa the page.** The AI model only *reads* the photo: each line, and where it is on the page.
+  The exact compiler finds the first line that changes the answer, and the display boxes it in red on
+  the photo, with a counterexample you can check by hand.
 - **It says "no" and "not sure" honestly:** word problems that can't be true as written are
-  certified impossible, and a line that is ambiguous or doesn't parse as an equation is held for
-  review instead of guessed. (It does no handwriting recognition: the host model reads the page.)
+  certified impossible, and a line the reader flags as unclear is held for review instead of guessed.
 - **Every result is a portable certificate** that anyone can re-check without trusting the assistant.
+  The public web page replays the server's certificates in your own browser.
 
-![Simulated Alexa+ display checking a child's homework: the spoken answer, the typed equations it understood, the exact line where the work breaks, and a certificate verified 17/17](docs/images/homework-check.png)
+![Simulated Alexa+ display checking a photo of a child's homework: the first wrong line boxed in red on the photo, the typed reading to check, the exact counterexample, and a certificate verified 17/17](docs/images/photo-check.png)
 
 > [!TIP]
-> **No install needed:** the [web demo](https://akari-h-111.github.io/algebraic-constraint-compiler/) runs the real
-> Python compiler and verifier in your browser (Guided requests, no AI). Point any MCP client at the public
-> endpoint `https://show-your-work-mcp.onrender.com/mcp` (free instance: the first request can take about
-> 50 seconds to wake it). To ask in your own words (typed or spoken) with the Claude or Gemini agent, [run it locally](#try-it-in-two-minutes).
+> **Try it in 30 seconds, no install.** The [web demo](https://akari-h-111.github.io/algebraic-constraint-compiler/)
+> is a real MCP client: it calls the public server (`initialize`, `tools/list`, `tools/call` over Streamable HTTP,
+> protocol 2025-11-25) and then replays each certificate in your browser with the independent Python verifier.
+> It uses Guided requests and runs no AI.
+>
+> **In Claude Code** (or any MCP host): `claude mcp add --transport http show-your-work https://show-your-work-mcp.onrender.com/mcp`,
+> then ask *"Maya wrote 3x + 5 = 20, then 3x = 25, then x = 25/3. Is her work right?"* The free server can take about
+> 50 seconds to wake up.
+>
+> **With your own voice, camera and AI agent** (Gemini or Claude): [run the simulator locally](#try-it-in-two-minutes).
 
 ## Why
 
@@ -55,6 +64,7 @@ confident wrong one. A voice assistant in the home shouldn't make them guess.
 
 | Ask Alexa… | Show Your Work returns (all certified) |
 |---|---|
+| *(holds up the page)* "Alexa, here's Maya's homework. Is it right?" | **The first line that changes the answer, boxed in red on the photo.** The model only transcribes each line and its position; everything after is exact. A line the reader flags as unclear is boxed in amber and held for review. |
 | "Check Maya's homework: 3x + 5 = 20, then 3x = 25, then x = 25/3." | **The first step that changes the answer**, with a counterexample: x = 5 works before the step but gives 15 ≠ 25 after it. A labelled, uncertified hint: "when +5 moves across, it becomes −5". |
 | "Adult tickets $12, child $7, 20 tickets for $300. How many child tickets?" | **No valid answer:** the only exact solution is −12 child tickets. The worksheet has a typo, proved by combining the two equations. |
 | "Maya says x = 4 for 2x − 7 = 1. Right?" | **Correct**, by substitution, and it is the only solution. |
@@ -181,10 +191,26 @@ publish the Streamable HTTP endpoint (`--host 0.0.0.0`; set
 
 Prompts: `homework_helper`, `word_problem`, `weekly_progress`, `reconstruction_workflow`.
 
-## Handwriting and the review state
+## Photos, handwriting and the review state
 
-`check_work` can keep each line of work tied to where it came from, and it never
-judges a line nobody has confirmed. This came from a viewer's comment on the demo
+**Show Alexa the page.** In the simulator, tap **Photo** (on a phone it opens the camera) or drop a
+picture on the display. The host checks the image type and size and fingerprints it (SHA-256, shown in
+the timeline), then sends it to the model with one job: transcribe each line exactly as the child wrote
+it, with its box on the page, and call `check_work`. The display then draws the *certified* result on
+the photo, zoomed to the work: a red box on the first line that changes the answer, a green tick on
+lines that follow, and an amber box on a line held for review. Boxes are `[left, top, right, bottom]`
+whole numbers on a 0–1000 scale of the photo. Without a model key (and in the web demo), the
+**Check a photo of the page** request replays a reading that Gemini 2.5 Flash really returned for the
+sample sheet on 2026-10-21, labelled as a recording; the sample sheets are rendered pictures, not camera photos.
+
+The reader can be wrong, and the design assumes it will be. In our tests, Gemini 2.5 Flash read an
+ambiguous "3x = 1S" as "3x = 15" without flagging it, three times out of three, and its boxes moved by
+tens of units between runs ([friction log](friction-log.md)). That is why the reading is always shown
+back ("What I understood — please check") beside the boxed photo, why the "unclear" photo example uses
+a reading written by hand (and says so), and why nothing the model reads is ever treated as proof.
+
+`check_work` keeps each line of work tied to where it came from, and it never
+judges a line nobody has confirmed. This came from a viewer's comment on the first demo
 video, which asked for source spans and a review state for steps that cannot be parsed.
 
 Pass an optional `provenance` list with one entry (or `null`) per line:
@@ -212,7 +238,7 @@ Pass an optional `provenance` list with one entry (or `null`) per line:
   not saved to the notebook. The verifier derives the held lines from the bound input,
   so a held line cannot be relabelled "all steps valid".
 
-What this is not: the compiler does no handwriting recognition and does not look at
+What this is not: the compiler does no handwriting recognition and never looks at
 images. The host model reads the page; Show Your Work only records where each line was,
 refuses to guess when the host is unsure, and certifies the algebra of what was confirmed.
 Spans are bound by the input digest but are not themselves verified. Nonlinear lines,

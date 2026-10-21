@@ -1,10 +1,15 @@
 """Synthesize demo narration and assistant replies with Gemini TTS (key from the git-ignored .env).
 
     python3 tools/video/tts_gemini.py <frames_dir> [--narrator Zephyr] [--assistant Kore] [--model NAME]
+                                      [--assistant-model NAME] [--only a,b] [--what narration|assistant|both] [--force]
 
 Writes <frames_dir>/narration/<scene>.wav (narrator; "pre" segments as <scene>.pre.wav) and
-<frames_dir>/speech/<scene>-<n>.wav (the assistant's recorded replies). The key is sent in a
-header, never in a URL, and is never printed.
+<frames_dir>/speech/<scene>-<n>.wav (the assistant's recorded replies). Clips that already exist are
+kept (quota is small) unless --force. --assistant-model uses a different model for the assistant's replies
+(for example gemini-2.5-flash-preview-tts while the narration uses gemini-3.1-flash-tts-preview).
+Without <frames_dir>/scenes.json (before recording) the scene list comes from the narration file, so the
+narration can be made first and the recorder can time its card reveals to the real voice.
+The key is sent in a header, never in a URL, and is never printed.
 """
 
 import argparse
@@ -85,29 +90,51 @@ def main():
     parser.add_argument("--assistant", default="Kore")
     parser.add_argument("--model")
     parser.add_argument("--only", help="Comma-separated scene names to (re)generate")
+    parser.add_argument("--assistant-model", help="Model for the assistant's replies (default: --model)")
+    parser.add_argument("--what", choices=("narration", "assistant", "both"), default="both")
+    parser.add_argument("--force", action="store_true", help="Regenerate clips that already exist")
+    parser.add_argument("--limit", type=int, default=None, help="Stop after this many API calls")
     args = parser.parse_args()
     load_env(str(ROOT / ".env"))
     if not os.environ.get("GEMINI_API_KEY"):
         raise SystemExit("GEMINI_API_KEY is not set (add it to .env)")
     frames = Path(args.frames)
     model = pick_model(args.model)
-    print("TTS model:", model)
+    assistant_model = args.assistant_model or model
+    print("TTS model:", model, "| assistant model:", assistant_model)
     narration = json.loads((ROOT / "tools/video" / os.environ.get("NARRATION", "narration.json")).read_text())["scenes"]
-    meta = json.loads((frames / "scenes.json").read_text())
+    meta_path = frames / "scenes.json"
+    meta = json.loads(meta_path.read_text()) if meta_path.exists() else {"scenes": [{"name": name} for name in narration]}
     only = set(args.only.split(",")) if args.only else None
+    calls = 0
+
+    def make(use_model, voice, text, path, style, label):
+        nonlocal calls
+        if path.exists() and not args.force:
+            print(f"{label}: kept ({path.name})")
+            return
+        if args.limit is not None and calls >= args.limit:
+            raise SystemExit(f"--limit {args.limit} reached before {label}")
+        calls += 1
+        seconds = synthesize(use_model, voice, text, path, style)
+        print(f"{label} [{use_model}]: {seconds:.1f}s")
+
     for scene in meta["scenes"]:
         name = scene["name"]
         if only and name not in only:
             continue
         text = narration.get(name) or ""
         parts = text if isinstance(text, dict) else {"post": text}
-        for key, suffix in (("pre", ".pre"), ("post", "")):
-            if parts.get(key):
-                seconds = synthesize(model, args.narrator, parts[key], frames / "narration" / f"{name}{suffix}.wav", STYLE_NARRATOR)
-                print(f"narration {name}{suffix}: {seconds:.1f}s")
-        for i, item in enumerate(scene.get("speech", [])):
-            seconds = synthesize(model, args.assistant, item["text"], frames / "speech" / f"{name}-{i}.wav", STYLE_ASSISTANT)
-            print(f"assistant {name}-{i}: {seconds:.1f}s")
+        if args.what in ("narration", "both"):
+            for key, suffix in (("pre", ".pre"), ("post", "")):
+                if parts.get(key):
+                    make(model, args.narrator, parts[key], frames / "narration" / f"{name}{suffix}.wav", STYLE_NARRATOR, f"narration {name}{suffix}")
+        if args.what in ("assistant", "both"):
+            for i, item in enumerate(scene.get("speech", [])):
+                if item.get("silent"):  # shown on screen only, never voiced
+                    continue
+                make(assistant_model, args.assistant, item["text"], frames / "speech" / f"{name}-{i}.wav", STYLE_ASSISTANT, f"assistant {name}-{i}")
+    print("API calls made:", calls)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,39 @@
+{
+  "voice_note": "v3 (Oct 21): photo homework check, the public web page as a real MCP client, and the same server in Claude Code. A string plays after any assistant reply; {pre, post} plays pre before the reply and post after it. Target total 2:45-2:55.",
+  "scenes": {
+    "01-title": "",
+    "02-why": "Over half of U.S. teens use AI chatbots for schoolwork, and four in ten for math. A chatbot sounds just as sure when it's wrong, so a parent can't tell a confident wrong answer from a right one. What if Alexa had to prove it?",
+    "03-photo": {
+      "pre": "This is Show Your Work: an Alexa+ skill built as a self-hosted MCP server, here on a simulated Alexa+ display. Maya's dad shows Alexa her homework.",
+      "post": "Gemini only reads the page: each line, and where it is. Our MCP server does the math in exact fractions and finds the first line that changes the answer. x equals 5 works on line one, but not on line two. An independent verifier replayed that proof before Alexa said a word."
+    },
+    "04-unclear": {
+      "pre": "When a line is unclear, the reader can flag it instead of guessing.",
+      "post": "A flagged line is held for review. Nothing is concluded about it, and every other step is still checked."
+    },
+    "05-typo": {
+      "pre": "Some worksheets can't be right as written.",
+      "post": "Twenty tickets for three hundred dollars forces minus twelve child tickets. That's a certified no, with a two-line proof."
+    },
+    "06-forgery": "Every result is an MCP App card. Replay re-runs the verifier. Try a forgery changes one number and recomputes the hash, and the verifier still rejects it.",
+    "07-web": "Anyone can try it with no install. This public web page is a real MCP client: it calls initialize, tools list and tools call on our hosted server over Streamable HTTP. Then your own browser replays the certificate with an independent copy of the verifier.",
+    "08-claude": "Because it's standard MCP, the same server works in other assistants. Here, Claude Code calls check work on the public endpoint and gets the same verified answer.",
+    "09-memory": {
+      "pre": "Alexa also makes practice problems with verified answer keys, and remembers progress.",
+      "post": "Every saved certificate is re-verified before it counts."
+    },
+    "10-architecture": "Under the hood: MCP 2025-11-25 over Streamable HTTP, an MCP Apps card, exact rational arithmetic, and a verifier that never imports the compiler.",
+    "11-close": "For parents, tutors and teachers: AI reads. The compiler calculates. The verifier certifies."
+  },
+  "chapters": {
+    "01-title": "Show Your Work",
+    "03-photo": "Show Alexa the page: the first wrong line, proved",
+    "04-unclear": "Unclear handwriting is held for review",
+    "05-typo": "A worksheet with a typo: certified no",
+    "06-forgery": "MCP Apps card: replay and forgery test",
+    "07-web": "The public web page is a real MCP client",
+    "08-claude": "The same MCP server in Claude Code",
+    "09-memory": "Practice and progress",
+    "10-architecture": "How it works"
+  }
+}

@@ -8,6 +8,7 @@ call the same MCP tools, clearly labelled as involving no AI interpretation.
 """
 
 import argparse
+import base64
 import importlib.util
 import json
 import os
@@ -22,16 +23,20 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from . import __version__
-from . import llm, tts
+from . import llm, photo, tts
 from .llm import ProviderError
+from .photo import PhotoError
 from .mcp_client import MCPClient, MCPError, ui_meta
 
 WEB = Path(__file__).with_name("web") / "alexa"
 VOICE = WEB / "voice"  # recorded Gemini TTS clips and their manifest (see tools/site/make_voice.py)
 VOICE_TYPES = {".mp3": "audio/mpeg", ".json": "application/json"}
+SAMPLES = WEB / "samples"  # rendered sample worksheets for the "photo" Guided request (see tools/site/make_samples.mjs)
+SAMPLE_TYPES = {".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
 LOCAL_NAMES = {"127.0.0.1", "localhost", "::1"}  # the server binds to 127.0.0.1; any other Host name is refused
 SPEAKABLE_REPLIES = 64  # how many recent on-screen replies /api/tts is willing to speak
 MAX_BODY = 1_000_000
+MAX_IMAGE_BODY = 8_000_000  # /api/turn only: a photo (at most photo.MAX_BYTES decoded) travels as base64 text in the JSON
 MAX_ROUNDS = 6
 
 SYSTEM = """You are Alexa+, a voice assistant on a kitchen smart display, using the Show Your Work skill.
@@ -47,18 +52,59 @@ Voice rules:
 - The certificate card appears on screen automatically; you can say "it's on the screen".
 - If something is unsupported or not verified, say so plainly and do not guess.
 
+Photo rules (only when the person attaches a photo of a page of homework):
+- A child wrote the page. Transcribe each line of the work exactly as the child wrote it, top to bottom, and never fix,
+  finish or improve it: a wrong line is copied wrong. The first line is the original problem. Skip names, dates, headings
+  and doodles. Write plain equation text such as 3x + 5 = 20, with / for fractions, and no line numbers or LaTeX.
+- Then call check_work once: steps has one list per line and provenance has exactly one entry per line, in the same order:
+  {{"source": {{"kind": "region", "page": 1, "box": [left, top, right, bottom]}}, "raw": "<that line exactly as you see it>"}}.
+- box is the rectangle around the handwriting of that line (not the printed rule under it), as four whole numbers on a
+  0 to 1000 scale of the photo itself, always in the order [left, top, right, bottom]: x comes first (left and right are
+  positions across the photo) and y second (top and bottom are positions down it); never y first. [0, 0] is the top-left
+  corner of the photo and [1000, 1000] its bottom-right corner; each axis is scaled to 1000 separately, whatever the photo's
+  shape; left < right and top < bottom. Example: a line that starts 20% of the way across and 30% of the way down, and ends
+  60% across and 36% down, is [200, 300, 600, 360].
+- If a character could be read two ways that would change the math (a 5 or an S, a 1 or a 7, a smudge, an unclear minus),
+  do not choose: add "review": {{"reason": "AMBIGUOUS_SYMBOL", "note": "5 or S?"}} to that line's entry (reasons:
+  AMBIGUOUS_SYMBOL, AMBIGUOUS_GROUPING, ILLEGIBLE, UNPARSEABLE, OTHER), keep raw as you see it, and put your best reading in
+  steps (an empty list if nothing is legible). A line with review is not judged; ask the person what it says.
+
 {instructions}"""
 
 SCENARIOS = [
     {"id": "work", "label": "Check Maya's homework",
      "utterance": "Alexa, check Maya's homework. The problem is 3x + 5 = 20. She wrote 3x = 25, then x = 25 over 3.",
      "tool": "check_work", "arguments": {"steps": [["3x + 5 = 20"], ["3x = 25"], ["x = 25/3"]]}},
+    # The reading below is what gemini-2.5-flash passed to check_work when /api/turn was sent web/alexa/samples/maya-homework.jpg
+    # (a live call on 2026-10-21, with the first revision of the photo rules; boxes are [left, top, right, bottom] on a 0-1000
+    # scale of the photo). Guided mode replays it with no model, and the timeline says so. The compiler and verifier check it afresh.
+    {"id": "photo", "label": "Check a photo of the page",
+     "utterance": "Alexa, here is Maya's homework page. Can you check it?",
+     "photo": "samples/maya-homework.jpg",
+     "tool": "check_work", "arguments": {
+         "steps": [["3x + 5 = 20"], ["3x = 25"], ["x = 25/3"]],
+         "provenance": [{"source": {"kind": "region", "page": 1, "box": [190, 270, 420, 300]}, "raw": "3x + 5 = 20"},
+                        {"source": {"kind": "region", "page": 1, "box": [190, 330, 350, 360]}, "raw": "3x = 25"},
+                        {"source": {"kind": "region", "page": 1, "box": [190, 390, 380, 420]}, "raw": "x = 25/3"}]},
+     "reading": {"model": "gemini-2.5-flash", "date": "2026-10-21", "recorded": True}},
     {"id": "review", "label": "A line I can't read",
      "utterance": "Alexa, check Maya's homework. The problem is 3x + 5 = 20. Her second line looks like 3x equals 1-S, "
                   "I can't tell if that's a 5, and then she wrote x = 5.",
      "tool": "check_work", "arguments": {
          "steps": [["3x + 5 = 20"], ["3x = 15"], ["x = 5"]],
          "provenance": [None, {"raw": "3x = 1S", "review": {"reason": "AMBIGUOUS_SYMBOL", "note": "5 or S?"}}, None]}},
+    # No model has read this sheet: the reading is written by hand (boxes measured from how the sample was drawn) and says so.
+    # Guided only: sent to a live model, this sheet was read as 15 with no flag in each of three tries (Gemini 2.5 Flash).
+    {"id": "photo-review", "label": "A photo with a line I can't read",
+     "utterance": "Alexa, here is Maya's homework page. I can't tell if her second line ends in a 5 or an S.",
+     "photo": "samples/maya-homework-unclear.jpg", "guided_only": True,
+     "tool": "check_work", "arguments": {
+         "steps": [["3x + 5 = 20"], ["3x = 15"], ["x = 5"]],
+         "provenance": [{"source": {"kind": "region", "page": 1, "box": [195, 226, 418, 280]}, "raw": "3x + 5 = 20"},
+                        {"source": {"kind": "region", "page": 1, "box": [190, 323, 349, 378]}, "raw": "3x = 1S",
+                         "review": {"reason": "AMBIGUOUS_SYMBOL", "note": "5 or S?"}},
+                        {"source": {"kind": "region", "page": 1, "box": [201, 406, 307, 457]}, "raw": "x = 5"}]},
+     "reading": {"model": None, "date": "2026-10-21", "recorded": False}},
     {"id": "tickets", "label": "A worksheet with a typo",
      "utterance": "Alexa, adult tickets cost $12 and child tickets cost $7. They sold 20 tickets for $300. How many child tickets?",
      "tool": "solve_equations", "arguments": {"equations": ["a + c = 20", "12a + 7c = 300"], "domain": "nonnegative_integer",
@@ -77,6 +123,17 @@ SCENARIOS = [
      "utterance": "Alexa, how is Maya doing with math this week?",
      "tool": "progress_report", "arguments": {"days": 7}},
 ]
+
+
+def reading_note(reading):
+    """How a Guided photo request says where its reading of the page came from (a recording, or an example)."""
+    reading = reading or {}
+    if reading.get("recorded"):
+        text = f"Recorded reading by {reading.get('model')} on {reading.get('date')}"
+    else:
+        text = "Example reading written for the demo, not a model output"
+    return {"recorded": bool(reading.get("recorded")), "model": reading.get("model"), "date": reading.get("date"),
+            "text": text + " \u2014 no AI runs in Guided mode. The sheet is a rendered sample, not a camera photo."}
 
 
 class VoiceUnavailable(Exception):
@@ -99,6 +156,7 @@ class Host:
         self.connected = False
         self.voice_cache = {}
         self.speakable = {}  # replies this host has produced; the voice endpoint speaks nothing else
+        self.samples = {}  # sample worksheet name -> checked photo, read once
 
     def ensure(self):
         if not self.connected:
@@ -151,7 +209,8 @@ class Host:
                 "providers": [{"name": n, "model": p.model} for n, p in self.providers.items()],
                 "provider_error": "; ".join(f"{n}: {e}" for n, e in self.provider_errors.items()) or None,
                 "voice": self.voice_info(),
-                "scenarios": [{k: s[k] for k in ("id", "label", "utterance")} for s in SCENARIOS]}
+                "scenarios": [{k: s[k] for k in ("id", "label", "utterance", "photo", "guided_only") if k in s} for s in SCENARIOS],
+                "photo": {"types": sorted(photo.TYPES), "max_bytes": photo.MAX_BYTES}}
         try:
             self.ensure()
             info.update(connected=True, protocol=self.mcp.protocol, server=self.mcp.server_info,
@@ -194,26 +253,51 @@ class Host:
             card_holder["card"] = {"tool": name, "arguments": arguments, "result": result, "resourceUri": uri}
         return "\n".join(c.get("text", "") for c in result.get("content", []) if c.get("type") == "text")
 
-    def turn(self, session_id, text, provider_name=None):
-        result = self._turn(session_id, text, provider_name)
+    def sample(self, name):
+        """A sample worksheet ("samples/<file>") as a checked photo (sha256, size), or None when it is missing."""
+        name = Path(name).name
+        with self.lock:
+            if name not in self.samples:
+                path = SAMPLES / name
+                try:
+                    self.samples[name] = photo.inspect({"mime": SAMPLE_TYPES[path.suffix], "data": base64.b64encode(path.read_bytes()).decode()})
+                except (OSError, KeyError, PhotoError):
+                    self.samples[name] = None
+            return self.samples[name]
+
+    def _photo_event(self, shot):
+        """The timeline row for a photo; `sample` is true when the bytes are one of the rendered sample sheets."""
+        known = {(self.sample(f.name) or {}).get("sha256") for f in SAMPLES.iterdir() if f.suffix in SAMPLE_TYPES}
+        return {"type": "photo", "mime": shot["mime"], "width": shot["width"], "height": shot["height"], "bytes": shot["bytes"],
+                "sha256": shot["sha256"], "sample": shot["sha256"] in known}
+
+    def turn(self, session_id, text, provider_name=None, image=None):
+        """One spoken or typed request, optionally with a photo of the page: `image` is {mime, data (base64)}."""
+        shot = photo.inspect(image) if image is not None else None  # PhotoError (4xx) before anything else happens
+        result = self._turn(session_id, text, provider_name, shot)
         self.allow_speech(result.get("reply"))
         return result
 
-    def _turn(self, session_id, text, provider_name=None):
+    def _turn(self, session_id, text, provider_name=None, shot=None):
         self.ensure()
+        if shot and not text:
+            text = f"Alexa, check {self.learner}'s homework on this page."
         events, holder = [{"type": "heard", "text": text}], {}
+        if shot:
+            events.append(self._photo_event(shot))
+        shown = {"photo": {"src": photo.data_url(shot), **{k: shot[k] for k in ("mime", "width", "height", "bytes", "sha256")}}} if shot else {}
         name = provider_name if provider_name in self.providers else self.default
         provider = self.providers.get(name) if name else None
         if not provider:
-            return {"reply": "No AI model is configured, so I can't interpret free speech. Try a Guided request.",
-                    "events": events + [{"type": "notice", "text": "No model configured"}], "card": None}
+            return {"reply": "No AI model is configured, so I can't interpret free speech" + (" or read a photo" if shot else "")
+                    + ". Try a Guided request.", "events": events + [{"type": "notice", "text": "No model configured"}], "card": None, **shown}
         with self.lock:
             messages = self.sessions.setdefault((session_id, name), [])  # one append-only history per model
             if len(messages) > 60:  # start fresh rather than editing history
                 messages.clear()
         system = SYSTEM.format(notebook=self.notebook, learner=self.learner, instructions=self.mcp.instructions)
         tools = self._model_tools()
-        provider.user(messages, text)
+        provider.user(messages, text, shot)
         reply = ""
         for _ in range(MAX_ROUNDS):
             started = time.monotonic()
@@ -223,7 +307,7 @@ class Host:
                 events.append({"type": "notice", "text": f"{provider.name}: {str(exc)[:300]}"})
                 with self.lock:
                     messages.clear()
-                return {"reply": "Sorry, my language model isn't reachable right now.", "events": events, "card": holder.get("card")}
+                return {"reply": "Sorry, my language model isn't reachable right now.", "events": events, "card": holder.get("card"), **shown}
             events.append({"type": "model", "provider": provider.name, "model": getattr(provider, "last_model", provider.model),
                            "ms": round((time.monotonic() - started) * 1000), "tool_calls": [c.name for c in calls]})
             if not calls:
@@ -237,23 +321,31 @@ class Host:
             payload = holder["card"]["result"].get("structuredContent") or {}
             reply = (payload.get("view") or {}).get("spoken") or ""
             events.append({"type": "reply", "text": reply, "source": "verified suggested speech (model reply was empty)"})
-            return {"reply": reply, "events": events, "card": holder.get("card")}
+            return {"reply": reply, "events": events, "card": holder.get("card"), **shown}
         events.append({"type": "reply", "text": reply})
-        return {"reply": reply, "events": events, "card": holder.get("card")}
+        return {"reply": reply, "events": events, "card": holder.get("card"), **shown}
 
     def guided(self, scenario_id):
         self.ensure()
         scenario = next((s for s in SCENARIOS if s["id"] == scenario_id), None)
         if scenario is None:
             raise ValueError("Unknown scenario")
-        events, holder = [{"type": "heard", "text": scenario["utterance"], "guided": True}], {}
+        events, holder, shown = [{"type": "heard", "text": scenario["utterance"], "guided": True}], {}, {}
+        if scenario.get("photo"):
+            # A rendered sample page plus the reading that was recorded from a model (or written by hand, and labelled so).
+            sample = self.sample(scenario["photo"])
+            if sample:
+                events.append({**self._photo_event(sample), "guided": True, "sample": True, "name": scenario["photo"]})
+                shown = {"photo": {"src": scenario["photo"], "sample": True, "reading": scenario.get("reading"),
+                                   **{k: sample[k] for k in ("mime", "width", "height", "bytes", "sha256")}}}
+            events.append({"type": "reading", "guided": True, **reading_note(scenario.get("reading"))})
         self._call(scenario["tool"], json.loads(json.dumps(scenario["arguments"])), events, holder)
         card = holder.get("card")
         payload = (card or {}).get("result", {}).get("structuredContent") or {}
         reply = (payload.get("view") or {}).get("spoken") or "No result."
         events.append({"type": "reply", "text": reply, "guided": True})
         self.allow_speech(reply)
-        return {"reply": reply, "events": events, "card": card, "guided": True}
+        return {"reply": reply, "events": events, "card": card, "guided": True, **shown}
 
     def app_tool(self, name, arguments):
         """Tool calls initiated by the card: only tools whose visibility includes 'app'."""
@@ -328,6 +420,12 @@ def make_handler(host):
                 if "/" in name or name.startswith(".") or path.suffix not in VOICE_TYPES or not path.is_file():
                     return self._send(404, {"error": "Not found"})
                 return self._send(200, path.read_bytes(), VOICE_TYPES[path.suffix])
+            if parsed.path.startswith("/samples/"):
+                name = parsed.path[len("/samples/"):]
+                path = SAMPLES / name
+                if "/" in name or name.startswith(".") or path.suffix not in SAMPLE_TYPES or not path.is_file():
+                    return self._send(404, {"error": "Not found"})
+                return self._send(200, path.read_bytes(), SAMPLE_TYPES[path.suffix])
             if parsed.path == "/api/config":
                 return self._send(200, host.config())
             if parsed.path == "/api/resource":
@@ -341,20 +439,27 @@ def make_handler(host):
             refused = self._refuse(post=True)
             if refused:
                 return self._send(refused[0], {"error": refused[1]})
-            length = int(self.headers.get("Content-Length") or 0)
-            if length > MAX_BODY:
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = -1
+            if length < 0:
+                return self._send(400, {"error": "Send a valid Content-Length"})
+            if length > (MAX_IMAGE_BODY if self.path == "/api/turn" else MAX_BODY):  # only a turn may carry a photo
                 return self._send(413, {"error": "Request too large"})
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
-            except json.JSONDecodeError:
+            except ValueError:  # bad JSON or bad UTF-8
                 return self._send(400, {"error": "Invalid JSON"})
+            if not isinstance(body, dict):
+                return self._send(400, {"error": "Send a JSON object"})
             try:
                 if self.path == "/api/turn":
-                    text = str(body.get("text", "")).strip()[:1000]
-                    if not text:
+                    text, image = str(body.get("text", "")).strip()[:1000], body.get("image")
+                    if not text and image is None:
                         return self._send(400, {"error": "Say or type something"})
                     return self._send(200, host.turn(str(body.get("session", "default"))[:64], text,
-                                                     str(body.get("provider") or "") or None))
+                                                     str(body.get("provider") or "") or None, image))
                 if self.path == "/api/guided":
                     return self._send(200, host.guided(str(body.get("scenario"))))
                 if self.path == "/api/tts":
@@ -369,6 +474,8 @@ def make_handler(host):
                     return self._send(200, {"ok": True})
             except PermissionError as exc:
                 return self._send(403, {"error": str(exc)})
+            except PhotoError as exc:
+                return self._send(exc.status, {"error": str(exc)})
             except VoiceUnavailable as exc:
                 return self._send(501, {"error": str(exc)})
             except tts.TTSError as exc:

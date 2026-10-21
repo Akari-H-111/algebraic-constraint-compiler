@@ -34,6 +34,14 @@ h2{font-size:72px;line-height:1.08;margin:0 0 28px;letter-spacing:-.025em}
 .tags{display:flex;gap:14px;flex-wrap:wrap;margin-top:34px}
 .tags span{border:1px solid var(--line);border-radius:999px;padding:10px 20px;font-size:24px;color:#cfd7ea}
 .url{margin-top:44px;font-size:30px;color:var(--muted);font-family:ui-monospace,Menlo,monospace}
+.term{margin-top:26px;border:1px solid var(--line);border-radius:22px;background:#0b0f17;padding:34px 40px;font:26px/1.55 ui-monospace,Menlo,monospace;color:#d6deef;white-space:pre-wrap}
+.term .p{color:var(--muted)}.term .u{color:#fff}.term .t{color:var(--accent)}.term .ok{color:var(--ok)}.term .w{color:var(--warn)}
+.meta{margin-top:22px;font-size:22px;color:var(--muted)}
+/* Step-by-step reveal for the recorder: with body.reveal, [data-rv=n] shows once rv(n) has been called (otherwise everything is visible). */
+body.reveal [data-rv]{opacity:0;transition:opacity .55s ease,transform .55s ease}
+body.reveal .stat[data-rv],body.reveal .node[data-rv],body.reveal .question[data-rv],body.reveal .flow[data-rv],body.reveal .tags[data-rv]{transform:translateY(14px)}
+body.reveal [data-rv].on{opacity:1}
+body.reveal .stat[data-rv].on,body.reveal .node[data-rv].on,body.reveal .question[data-rv].on,body.reveal .flow[data-rv].on,body.reveal .tags[data-rv].on{transform:none}
 .lower{position:absolute;left:0;right:0;bottom:0;padding:22px 150px;font-size:22px;color:var(--muted);border-top:1px solid var(--line);background:rgba(0,0,0,.25)}
 </style>
 </head>
@@ -42,39 +50,54 @@ h2{font-size:72px;line-height:1.08;margin:0 0 28px;letter-spacing:-.025em}
 <section id="title">
   <div class="logo">✓</div>
   <h1>Show Your Work</h1>
-  <p class="sub">Math answers Alexa+ can prove.</p>
+  <p class="sub">Math answers Alexa+ can prove. An Alexa+ skill built as a self-hosted MCP server.</p>
   <p class="thesis">AI <span>interprets</span>. Compiler <span>calculates</span>. Verifier <span>certifies</span>.</p>
+  <div class="lower">Simulated Alexa+ experience built for the Amazon Developer Hackathon. Not an Amazon product.</div>
 </section>
 <section id="why">
   <h2>Kids already ask AI for math help.</h2>
   <div class="stats">
-    <div class="stat"><b>~4 in 10</b><p>U.S. teens have used AI chatbots to solve math problems.</p><small>Pew Research Center, “How Teens Use and View AI”, Feb 2026 (survey Sept–Oct 2025, n = 1,458 teens)</small></div>
-    <div class="stat"><b>up to 65%</b><p>accuracy drop when one irrelevant clause is added to a math word problem.</p><small>Mirzadeh et al., “GSM-Symbolic”, Apple Machine Learning Research, 2024</small></div>
+    <div class="stat" data-rv="1"><b>~4 in 10</b><p>U.S. teens have used AI chatbots to solve math problems.</p><small>Pew Research Center, “How Teens Use and View AI”, Feb 2026 (survey Sept–Oct 2025, n = 1,458 teens)</small></div>
+    <div class="stat" data-rv="2"><b>up to 65%</b><p>accuracy drop when one irrelevant clause is added to a math word problem.</p><small>Mirzadeh et al., “GSM-Symbolic”, Apple Machine Learning Research, 2024</small></div>
   </div>
-  <p class="question">What if Alexa had to prove it?</p>
+  <p class="question" data-rv="3">What if Alexa had to prove it?</p>
 </section>
 <section id="arch">
   <h2>How it works</h2>
   <div class="arch">
-    <div class="node ai"><div class="k">AI interprets</div><h3>Alexa+ agent</h3><p>Turns speech into typed equations and shows them back for a parent to check. It never calculates.</p></div>
-    <div class="node"><div class="k">MCP · 2025-11-25</div><h3>Show Your Work server</h3><p>Self-hosted, Streamable HTTP. 8 tools, 4 prompts, and an app-only forgery check.</p></div>
-    <div class="node"><div class="k">Compiler calculates</div><h3>Exact over ℚ</h3><p>No floats, no eval. Every answer carries a witness: a combination, a contradiction, or a counterexample.</p></div>
-    <div class="node ver"><div class="k">Verifier certifies</div><h3>Independent replay</h3><p>It never imports the compiler. It re-reads the text and checks by multiplying and adding.</p></div>
+    <div class="node ai" data-rv="1"><div class="k">AI reads</div><h3>Alexa+ agent</h3><p>Turns a photo or spoken words into typed equations and shows them back. It never calculates.</p></div>
+    <div class="node" data-rv="2"><div class="k">MCP · 2025-11-25</div><h3>Show Your Work server</h3><p>Self-hosted, Streamable HTTP, public endpoint. 10 tools, 4 prompts, an MCP Apps card.</p></div>
+    <div class="node" data-rv="3"><div class="k">Compiler calculates</div><h3>Exact over ℚ</h3><p>No floats, no eval. Every answer carries a witness: a combination, a contradiction, or a counterexample.</p></div>
+    <div class="node ver" data-rv="4"><div class="k">Verifier certifies</div><h3>Independent replay</h3><p>Never imports the compiler. Replays on the server, in your browser, or anywhere.</p></div>
   </div>
-  <p class="flow"><b>MCP Apps card</b> (SEP-1865) renders in any compliant host · <b>Family notebook</b> re-verified on every read · <b>Research tier</b>: same engine certifies algebraic deformation obstructions</p>
-  <div class="tags"><span>Gemini agent in the demo</span><span>Claude &amp; Bedrock wired, not run live</span><span>102 automated tests</span><span>real HTTP MCP</span><span>rehashed forgeries rejected</span></div>
+  <p class="flow" data-rv="5"><b>Clients:</b> simulated Alexa+ display · public web page (browser MCP client) · Claude Code · any MCP host &nbsp;·&nbsp; <b>Family notebook</b> re-verified on every read</p>
+  <div class="tags" data-rv="5"><span>Gemini agent and page reading in the demo</span><span>Claude &amp; Bedrock providers wired</span><span id="tests">115 automated tests</span><span>rehashed forgeries rejected</span></div>
+</section>
+<section id="claude">
+  <h2>The same MCP server, in Claude Code</h2>
+  <div class="term"><span data-rv="1"><span class="p">$</span> <span class="u">claude -p --mcp-config mcp.json</span> <span class="p">"Maya's lines: 3x + 5 = 20, then 3x = 25, then x = 25/3. Is her work right?"</span>
+<span class="p">  mcp.json → show-your-work · https://show-your-work-mcp.onrender.com/mcp (Streamable HTTP)</span>
+
+</span><span data-rv="2"><span class="t">⏺ show-your-work · check_work</span>  steps: [["3x + 5 = 20"], ["3x = 25"], ["x = 25/3"]]
+<span class="ok">  ⎿ MATHEMATICALLY_REJECTED · work.error_found · certificate_verified: true · replay 17/17</span>
+
+</span><span data-rv="3"><span class="u">⏺ No, Maya's work isn't right. The verified check found the mistake in her first step
+  (3x + 5 = 20 → 3x = 25), because x = 5 satisfies the original equation but not 3x = 25.</span></div>
+  <p class="meta">Real run on 2026-10-21 · Claude Code 2.1.305 · claude-sonnet-5-5 · certificate fe69209a44cc5aed… · output shortened</p>
 </section>
 <section id="close">
   <div class="logo">✓</div>
   <h1>Show Your Work</h1>
-  <p class="thesis">AI <span>interprets</span>. Compiler <span>calculates</span>. Verifier <span>certifies</span>.</p>
-  <p class="url">Try it in your browser: akari-h-111.github.io/algebraic-constraint-compiler<br>Source: github.com/Akari-H-111/algebraic-constraint-compiler</p>
+  <p class="sub">For parents, tutors and teachers.</p>
+  <p class="thesis">AI <span>reads</span>. Compiler <span>calculates</span>. Verifier <span>certifies</span>.</p>
+  <p class="url">Try it in your browser: akari-h-111.github.io/algebraic-constraint-compiler<br>Source: github.com/Akari-H-111/algebraic-constraint-compiler<br>MCP endpoint: show-your-work-mcp.onrender.com/mcp</p>
   <div class="lower">Simulated Alexa+ experience built for the Amazon Developer Hackathon. Not an Amazon product.</div>
 </section>
 </div>
 <script>
 function show(){ const id = location.hash.slice(1) || 'title'; document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === id)); }
 function fit(){ document.getElementById('frame').style.transform = 'scale(' + (innerWidth / 1920) + ')'; }
+window.rv = n => document.querySelectorAll('[data-rv]').forEach(e => e.classList.toggle('on', Number(e.dataset.rv) <= n));
 window.addEventListener('hashchange', show); window.addEventListener('resize', fit); fit(); show();
 </script>
 </body>

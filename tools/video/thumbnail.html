@@ -7,24 +7,24 @@
 :root{--bg:#070a10;--text:#eef2fb;--muted:#9aa6bf;--accent:#27d3ff;--accent2:#5b7cff;--warn:#ffb14a;--ok:#3ccf91;--line:#222b3d}
 *{box-sizing:border-box}
 html,body{margin:0;width:1500px;height:1000px;overflow:hidden;background:radial-gradient(1200px 800px at 15% -10%,#18284d 0%,var(--bg) 60%);color:var(--text);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
-.left{position:absolute;left:80px;top:100px;width:600px}
+.left{position:absolute;left:70px;top:100px;width:560px}
 .logo{width:84px;height:84px;border-radius:24px;display:grid;place-items:center;font-size:50px;font-weight:800;color:#061018;background:linear-gradient(135deg,var(--accent),var(--accent2));margin-bottom:30px}
 h1{font-size:92px;line-height:.98;margin:0 0 22px;letter-spacing:-.04em}
 .sub{font-size:36px;line-height:1.2;color:#cfd7ea;margin:0 0 34px}
 .chips{display:flex;flex-direction:column;gap:14px}
-.chip{font-size:25px;color:var(--muted)}.chip b{color:var(--text)}
+.chip{font-size:23px;line-height:1.25;color:var(--muted)}.chip b{color:var(--text)}
 .thesis{margin:46px 0 0;font-size:30px;font-weight:650;line-height:1.3;color:var(--muted)}
 .sim{position:absolute;right:60px;bottom:60px;font-size:24px;color:var(--muted)}
 .thesis span{color:var(--accent)}
-.shot{position:absolute;right:60px;top:150px;width:740px;height:700px;border-radius:20px;overflow:hidden;border:1px solid #2a3552;background:#111726;box-shadow:0 30px 80px rgba(0,0,0,.55)}
-.shot img{position:absolute;display:block;width:1295px;left:0;top:0}
+.shot{position:absolute;right:30px;top:190px;width:850px;height:541px;border-radius:20px;overflow:hidden;border:1px solid #2a3552;background:#111726;box-shadow:0 30px 80px rgba(0,0,0,.55)}
+.shot img{position:absolute;display:block;width:850px;left:0;top:0}
 /* #wide: the 16:9 version used as a video poster (1280x720) */
 body.wide{width:1280px;height:720px}html:has(body.wide){width:1280px;height:720px}
-.wide .left{left:60px;top:52px;width:540px}.wide .logo{width:64px;height:64px;font-size:38px;border-radius:18px;margin-bottom:18px}
-.wide h1{font-size:78px;margin-bottom:16px}.wide .sub{font-size:30px;margin-bottom:22px}.wide .chips{gap:10px}.wide .chip{font-size:21px}
+.wide .left{left:52px;top:44px;width:500px}.wide .logo{width:64px;height:64px;font-size:38px;border-radius:18px;margin-bottom:18px}
+.wide h1{font-size:78px;margin-bottom:16px}.wide .sub{font-size:30px;margin-bottom:22px}.wide .chips{gap:10px}.wide .chip{font-size:18px}
 .wide .thesis{font-size:26px;margin-top:26px}
-.wide .shot{right:48px;top:96px;width:610px;height:494px;border-radius:18px}.wide .shot img{width:1070px}
-.wide .sim{right:48px;top:604px;font-size:20px}
+.wide .shot{right:30px;top:130px;width:690px;height:439px;border-radius:18px}.wide .shot img{width:690px}
+.wide .sim{right:40px;top:588px;font-size:20px}
 </style>
 </head>
 <body>
@@ -33,14 +33,14 @@ body.wide{width:1280px;height:720px}html:has(body.wide){width:1280px;height:720p
   <h1>Show Your Work</h1>
   <p class="sub">Math answers Alexa+ can prove.</p>
   <div class="chips">
-    <div class="chip"><b>Finds the exact wrong step</b> in a child's homework</div>
+    <div class="chip"><b>Show Alexa the page</b>: the wrong line gets a red box</div>
     <div class="chip"><b>Catches impossible</b> worksheet problems</div>
     <div class="chip"><b>Every answer replayed</b> by an independent verifier</div>
-    <div class="chip"><b>MCP 2025-11-25</b> · MCP Apps card</div>
+    <div class="chip"><b>MCP 2025-11-25</b> · Streamable HTTP · MCP Apps</div>
   </div>
   <p class="thesis">AI <span>interprets</span>.<br>Compiler <span>calculates</span>.<br>Verifier <span>certifies</span>.</p>
 </div>
-<div class="shot"><img src="../../docs/images/card-work.png" alt=""></div>
+<div class="shot"><img src="../../docs/images/photo-check.png" alt=""></div>
 <p class="sim">Simulated Alexa+ display · not an Amazon product</p>
 <script>if (location.hash === '#wide') document.body.classList.add('wide');</script>
 </body>

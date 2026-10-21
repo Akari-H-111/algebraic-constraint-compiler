@@ -12,6 +12,7 @@ import time
 import unittest
 import urllib.request
 
+from algebraic_compiler import __version__
 from algebraic_compiler.linear_verifier import verify_bundle
 from algebraic_compiler.mcp_client import MCPClient, ui_meta
 
@@ -67,6 +68,7 @@ class ShowYourWorkMCPTests(unittest.IsolatedAsyncioTestCase):
             async with ClientSession(read, write) as client:
                 initialized = await client.initialize()
                 self.assertEqual(initialized.protocolVersion, "2025-11-25")
+                self.assertEqual((initialized.serverInfo.name, initialized.serverInfo.version), ("Show Your Work", __version__))
                 self.assertIn("No LLM output is a proof", initialized.instructions)
                 tools = {t.name: t for t in (await client.list_tools()).tools}
                 for name in ("solve_equations", "check_answer", "check_work", "practice_problem", "verify_certificate",

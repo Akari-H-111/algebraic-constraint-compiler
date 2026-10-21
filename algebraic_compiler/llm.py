@@ -63,6 +63,9 @@ def simplify_schema(schema):
     return {k: simplify_schema(v) for k, v in schema.items() if k not in ("title", "$schema")}
 
 
+IMAGE_FORMATS = {"image/jpeg": "jpeg", "image/png": "png", "image/webp": "webp"}
+
+
 class Call:
     __slots__ = ("id", "name", "arguments")
 
@@ -74,8 +77,14 @@ class _Provider:
     name = "none"
     model = None
 
-    def user(self, messages, text):
-        messages.append({"role": "user", "content": text})
+    def user(self, messages, text, image=None):
+        """Add the person's turn. `image` is a checked photo ({mime, data: base64}); each provider has its own shape."""
+        if image:  # OpenAI-style content parts (also what Gemini's compatible endpoint takes)
+            content = [{"type": "text", "text": text},
+                       {"type": "image_url", "image_url": {"url": f"data:{image['mime']};base64,{image['data']}"}}]
+        else:
+            content = text
+        messages.append({"role": "user", "content": content})
 
     def complete(self, system, tools, messages):
         raise NotImplementedError
@@ -146,6 +155,14 @@ class Anthropic(_Provider):
                                           base_url=os.environ.get("SYW_ANTHROPIC_BASE_URL", "https://api.anthropic.com"))
         self.model = model or "claude-opus-5-5"
 
+    def user(self, messages, text, image=None):
+        if not image:
+            return super().user(messages, text)
+        # The picture comes first, as the API's guidance suggests.
+        messages.append({"role": "user", "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": image["mime"], "data": image["data"]}},
+            {"type": "text", "text": text}]})
+
     def complete(self, system, tools, messages):
         response = self.client.beta.messages.create(
             model=self.model, max_tokens=16000, system=system, messages=messages,
@@ -181,8 +198,11 @@ class Bedrock(_Provider):
         if not self.bearer and not (self.access and self.secret):
             raise ProviderError("Set AWS_BEARER_TOKEN_BEDROCK or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY")
 
-    def user(self, messages, text):
-        messages.append({"role": "user", "content": [{"text": text}]})
+    def user(self, messages, text, image=None):
+        parts = [{"text": text}]
+        if image:  # Converse takes the format name and the bytes (base64 text in the REST JSON)
+            parts.append({"image": {"format": IMAGE_FORMATS[image["mime"]], "source": {"bytes": image["data"]}}})
+        messages.append({"role": "user", "content": parts})
 
     def complete(self, system, tools, messages):
         url = (f"https://bedrock-runtime.{self.region}.amazonaws.com/model/"

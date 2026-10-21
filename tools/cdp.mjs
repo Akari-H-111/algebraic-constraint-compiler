@@ -7,6 +7,7 @@
 // plan.json: {"url": "...", "width": 1920, "height": 1080, "scale": 1, "out": "dir",
 //             "steps": [{"eval": "js"}, {"wait": 500}, {"shot": "name.png"},
 //                       {"shot": "part.png", "clipEval": "js returning {x, y, width, height} in CSS pixels"},
+//                       {"shot": "photo.jpg"}   (a .jpg/.jpeg name saves a JPEG at plan.quality, default 85),
 //                       {"record": 12, "seconds": 5, "prefix": "clip"}]}
 // "scale" is the device pixel ratio (default 1); a clipped shot is cropped to that region of the page.
 import { spawn } from 'node:child_process';
@@ -57,7 +58,9 @@ await sleep(plan.settle ?? 1500);
 
 let frameIndex = 0;
 async function shot(path, clip) {
-  const params = { format: 'png', captureBeyondViewport: false };
+  const jpeg = /\.jpe?g$/i.test(path);
+  const params = { format: jpeg ? 'jpeg' : 'png', captureBeyondViewport: false };
+  if (jpeg) params.quality = plan.quality || 85;
   if (clip) params.clip = { x: clip.x, y: clip.y, width: clip.width, height: clip.height, scale: 1 };
   const { data } = await send('Page.captureScreenshot', params);
   writeFileSync(path, Buffer.from(data, 'base64'));

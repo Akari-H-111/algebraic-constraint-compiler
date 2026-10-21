@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sample homework sheet (rendered, fictional)</title>
+<!-- Generator for algebraic_compiler/web/alexa/samples/*.jpg. These are RENDERED pictures of a fictional child's
+     pencil work (Maya, Rivera family), not camera photos of a real child. Fonts: Google Fonts (SIL OFL). Build:
+       node tools/site/make_samples.mjs
+     Pick a sheet with the URL hash: sample_sheet.html#work or #unclear. The page is 1200x1600 CSS pixels. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam&family=Patrick+Hand&display=block">
+<style>
+  html,body{margin:0;background:#2b2926}
+  #photo{position:relative;width:1200px;height:1600px;overflow:hidden;
+    background:radial-gradient(900px 700px at 20% 15%,#4a463f,#2a2723 70%),#2b2926;filter:blur(.55px) contrast(1.02)}
+  /* The page: 72px rules (lines of work sit on them), a red margin, then a little perspective like a phone held above a desk. */
+  #page{position:absolute;left:36px;top:-30px;width:1140px;height:1700px;
+    transform:perspective(2200px) rotateX(5deg) rotateY(-3.2deg) rotateZ(-1.1deg);transform-origin:50% 40%;
+    background:
+      linear-gradient(90deg,transparent 150px,rgba(205,70,70,.55) 150px,rgba(205,70,70,.55) 153px,transparent 153px),
+      repeating-linear-gradient(180deg,transparent 0,transparent 70px,rgba(86,128,186,.55) 70px,rgba(86,128,186,.55) 72px),
+      linear-gradient(100deg,#f6f2e6,#efe9d8 55%,#e9e2cf);
+    background-position:0 0,0 22px,0 0;
+    box-shadow:0 30px 60px rgba(0,0,0,.55),0 0 0 1px rgba(0,0,0,.12)}
+  /* Holes on the left edge. */
+  .hole{position:absolute;left:46px;width:44px;height:44px;border-radius:50%;background:#2a2723;box-shadow:inset 3px 4px 8px rgba(0,0,0,.7)}
+  .ink{position:absolute;color:#363940;white-space:nowrap;transform-origin:0 80%;mix-blend-mode:multiply;line-height:1;
+    text-shadow:0 0 1.1px rgba(59,62,70,.7),.5px .4px 0 rgba(59,62,70,.3);opacity:.94;filter:url(#pencil)}
+  .head{font:400 40px/1 'Patrick Hand',cursive;color:#52555f}
+  .work{font:400 64px/1 'Patrick Hand',cursive}
+  /* The one hard-to-read character: a 5 whose top bar is as round as an S, so it could be either (Kalam draws both alike). */
+  .amb{display:inline-block;font:400 62px/1 'Kalam',cursive;transform:translateY(2px) skewX(-7deg)}
+  #light{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(1100px 900px at 28% 18%,rgba(255,246,222,.30),transparent 62%),
+      radial-gradient(1500px 1300px at 50% 50%,transparent 55%,rgba(0,0,0,.50) 100%)}
+  #grain{position:absolute;inset:0;pointer-events:none;opacity:.22;mix-blend-mode:multiply}
+</style>
+</head>
+<body>
+<div id="photo">
+  <div id="page"></div>
+  <div id="light"></div>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="pencil" x="-5%" y="-20%" width="110%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="3" result="w"/><feDisplacementMap in="SourceGraphic" in2="w" scale="2.6" result="d"/>
+    <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="1" seed="11" result="g"/>
+    <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.3 1.38" result="mask"/><feComposite in="d" in2="mask" operator="in"/></filter></svg>
+  <svg id="grain" width="1200" height="1600" aria-hidden="true"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .9 0"/></filter><rect width="100%" height="100%" filter="url(#n)"/></svg>
+</div>
+<script>
+'use strict';
+// Which sheet is drawn comes from the URL hash. In `unclear` the second line ends in a character that is a 5 or an S (in this sheet's own words: the child meant 15).
+const SHEETS = {
+  work: {lines: ['3x + 5 = 20', '3x = 25', 'x = 25/3']},
+  unclear: {lines: ['3x + 5 = 20', '3x = 1<span class="amb">S</span>', 'x = 5']},
+};
+const sheet = SHEETS[location.hash.slice(1)] || SHEETS.work;
+const page = document.getElementById('page');
+const add = (cls, html, x, ruleNo, dx, dy, rot, size) => {
+  const n = document.createElement('div');
+  n.className = 'ink ' + cls;
+  n.innerHTML = html;
+  n.style.left = x + dx + 'px';
+  n.style.top = (ruleNo * 72 + 22 - (cls === 'work' ? 56 : 35) + dy) + 'px';  // the baseline sits just above rule number ruleNo
+  n.style.transform = `rotate(${rot}deg)`;
+  if (size) n.style.fontSize = size;
+  page.append(n);
+  return n;
+};
+for (let i = 0; i < 3; i++) { const h = document.createElement('div'); h.className = 'hole'; h.style.top = (150 + i * 560) + 'px'; page.append(h); }
+add('head', 'Maya R.', 190, 2, 0, 3, -0.4);
+add('head', 'Algebra · Oct 21', 700, 2, 0, -2, 0.3);
+add('head', 'Solve for x:', 190, 4, 4, 2, -0.5);
+// Per-line wobble: a little rotation, baseline drift, indent and size, as in a real hand.
+const wobble = [[2, -3, -0.6, '62px'], [-6, 4, 0.5, '65px'], [8, -2, -0.9, '61px']];
+sheet.lines.forEach((text, i) => add('work', text, 200, 6 + i * 2, wobble[i][0], wobble[i][1], wobble[i][2], wobble[i][3]));
+// Ground truth for QA: each line of work as a [left, top, right, bottom] box in the final picture, on a 0-1000 scale.
+window.workBoxes = () => [...page.querySelectorAll('.work')].map(n => {
+  const r = n.getBoundingClientRect();
+  return [r.left, r.top, r.right, r.bottom].map((v, k) => Math.round(v / (k % 2 ? 1.6 : 1.2)));
+});
+document.fonts.ready.then(() => { document.title = 'ready'; });
+</script>
+</body>
+</html>

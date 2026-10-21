@@ -98,8 +98,10 @@ def _security(host):
 
 def create_server(port=8000, host="127.0.0.1"):
     server = FastMCP("Show Your Work", instructions=INSTRUCTIONS, host=host, port=port,
+                     website_url="https://github.com/Akari-H-111/algebraic-constraint-compiler",
                      stateless_http=True, json_response=True, max_request_body_size=MAX_BYTES,
                      log_level="WARNING", transport_security=_security(host))
+    server._mcp_server.version = __version__  # FastMCP has no version argument; serverInfo would report the SDK's
 
     @server.resource(CARD_URI, name="certificate_card", title="Show Your Work certificate card",
                      description="Interactive certificate: translation, proof steps, replay and forgery check.",

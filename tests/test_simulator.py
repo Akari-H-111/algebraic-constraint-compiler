@@ -19,11 +19,13 @@ import urllib.request
 from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer
 
+import base64
 import hashlib
+import http.client
 import io
 import wave
 
-from algebraic_compiler import llm, notebook, simulator, tts
+from algebraic_compiler import llm, notebook, photo, simulator, tts
 from algebraic_compiler.llm import Call, simplify_schema, sigv4
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -187,6 +189,35 @@ class ScriptedProvider(llm._Provider):
             messages.append({"role": "tool", "tool_call_id": call_id, "content": text})
 
 
+SAMPLE_PHOTO = ROOT / "algebraic_compiler" / "web" / "alexa" / "samples" / "maya-homework.jpg"
+
+
+class ScriptedPhotoProvider(llm._Provider):
+    """Stands in for a model that reads a photo: sees the picture in its user message, then calls check_work with boxes."""
+
+    name, model = "scripted", "test"
+    READING = {"steps": [["3x + 5 = 20"], ["3x = 25"]], "provenance": [
+        {"source": {"kind": "region", "page": 1, "box": [190, 270, 420, 300]}, "raw": "3x + 5 = 20"},
+        {"source": {"kind": "region", "page": 1, "box": [190, 330, 350, 360]}, "raw": "3x = 25"}]}
+
+    def __init__(self):
+        self.calls, self.seen = 0, None
+
+    def complete(self, system, tools, messages):
+        self.calls += 1
+        assert "0 to 1000" in system and "Photo rules" in system
+        if self.calls == 1:
+            self.seen = messages[-1]["content"]
+            messages.append({"role": "assistant", "content": "", "tool_calls": [1]})
+            return "", [Call("p1", "check_work", json.loads(json.dumps(self.READING)))]
+        messages.append({"role": "assistant", "content": "It's on the screen."})
+        return "It's on the screen.", []
+
+    def tool_results(self, messages, results):
+        for call_id, _name, text in results:
+            messages.append({"role": "tool", "tool_call_id": call_id, "content": text})
+
+
 def free_port():
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
@@ -253,7 +284,7 @@ class SimulatorHTTPTests(unittest.TestCase):
             self.assertEqual(len(tool_events), 1)
             verdicts[scenario["id"]] = tool_events[0]["verdict"]
             self.assertTrue(data["reply"])
-        self.assertEqual(verdicts, {"work": "error_found", "review": "needs_review", "tickets": "no_valid_answer",
+        self.assertEqual(verdicts, {"work": "error_found", "photo": "error_found", "review": "needs_review", "photo-review": "needs_review", "tickets": "no_valid_answer",
                                     "practice": "practice",
                                     "answer": "correct", "system": "unique_solution", "progress": "progress"})
 
@@ -339,6 +370,162 @@ class SimulatorHTTPTests(unittest.TestCase):
             with mock.patch.object(simulator.tts, "synthesize", broken):
                 status, body = self.request("/api/tts", {"text": other})
             self.assertEqual((status, body["error"]), (502, "Gemini TTS returned HTTP 503"))
+
+    def test_guided_photo_request_replays_the_recorded_reading_over_real_mcp(self):
+        scenario = next(s for s in simulator.SCENARIOS if s["id"] == "photo")
+        self.assertEqual(json.loads(json.dumps(scenario)), scenario)  # the static site ships SCENARIOS as scenarios.json
+        status, data = self.request("/api/guided", {"scenario": "photo"})
+        self.assertEqual(status, 200)
+        self.assertEqual(data["photo"]["src"], scenario["photo"])
+        self.assertEqual((data["photo"]["width"], data["photo"]["height"]), (1200, 1600))
+        self.assertEqual(data["photo"]["sha256"], hashlib.sha256(SAMPLE_PHOTO.read_bytes()).hexdigest())
+        kinds = [e["type"] for e in data["events"]]
+        self.assertEqual(kinds, ["heard", "photo", "reading", "tool", "reply"])
+        reading = data["events"][2]
+        self.assertTrue(reading["recorded"])
+        self.assertEqual(reading["text"].split(" \u2014 ")[0], "Recorded reading by gemini-2.5-flash on 2026-10-21")
+        self.assertIn("no AI runs in Guided mode", reading["text"])
+        self.assertTrue(data["events"][1]["sample"])
+        # The verified result carries the recorded reading's boxes: the first wrong line is line 2, and its box is the recorded one.
+        result = data["card"]["result"]["structuredContent"]
+        self.assertTrue(result["certificate_verified"])
+        self.assertEqual(result["verdict"], "error_found")
+        recorded = scenario["arguments"]["provenance"]
+        self.assertEqual(result["view"]["focus"]["step_index"], 1)
+        self.assertEqual(result["view"]["focus"]["source"], recorded[1]["source"])
+        self.assertEqual(result["view"]["focus"]["source"]["box"], recorded[1]["source"]["box"])
+        self.assertEqual(result["bundle"]["input"]["provenance"], recorded)
+        self.assertEqual([t["status"] for t in result["bundle"]["certificate"]["result"]["transitions"]], ["breaks", "sound"])
+        for note in recorded:  # whole numbers inside the photo's 0-1000 frame
+            left, top, right, bottom = note["source"]["box"]
+            self.assertTrue(all(type(v) is int for v in note["source"]["box"]))
+            self.assertTrue(0 <= left < right <= 1000 and 0 <= top < bottom <= 1000)
+        self.assertEqual(scenario["reading"], {"model": "gemini-2.5-flash", "date": "2026-10-21", "recorded": True})
+        # The page and the sample sheet are served; nothing else can be fetched through the samples route.
+        with urllib.request.urlopen(self.base + "/" + data["photo"]["src"]) as response:
+            self.assertEqual(response.headers["Content-Type"], "image/jpeg")
+            self.assertEqual(response.read()[:3], b"\xff\xd8\xff")
+        for bad in ("/samples/nope.jpg", "/samples/..%2Fsimulator.py", "/samples/.hidden", "/samples/maya-homework.jpg/../../alexa.js", "/samples/"):
+            self.assertEqual(self.request(bad)[0], 404, bad)
+        self.assertEqual([s["photo"] for s in self.request("/api/config")[1]["scenarios"] if "photo" in s],
+                         ["samples/maya-homework.jpg", "samples/maya-homework-unclear.jpg"])
+
+    def test_guided_photo_with_a_line_to_review_draws_nothing_that_is_not_in_the_result(self):
+        scenario = next(s for s in simulator.SCENARIOS if s["id"] == "photo-review")
+        status, data = self.request("/api/guided", {"scenario": "photo-review"})
+        self.assertEqual(status, 200)
+        reading = next(e for e in data["events"] if e["type"] == "reading")
+        self.assertFalse(reading["recorded"])
+        self.assertTrue(reading["text"].startswith("Example reading written for the demo, not a model output"))  # honest label
+        self.assertIn("no AI runs in Guided mode", reading["text"])
+        self.assertTrue(scenario["guided_only"])  # a live model reads this sheet as 15, so a model-mode click replays it, not sends it
+        result = data["card"]["result"]["structuredContent"]
+        self.assertTrue(result["certificate_verified"])
+        self.assertEqual(result["verdict"], "needs_review")
+        view = result["view"]
+        self.assertEqual([(r["step_index"], r["reason"], r["note"]) for r in view["review"]], [(1, "AMBIGUOUS_SYMBOL", "5 or S?")])
+        self.assertEqual(view["review"][0]["source"]["box"], scenario["arguments"]["provenance"][1]["source"]["box"])
+        self.assertEqual({t["status"] for t in result["bundle"]["certificate"]["result"]["transitions"]}, {"needs_review"})  # no tick to draw
+        status, config = self.request("/api/config")
+        self.assertEqual([s["id"] for s in config["scenarios"] if s.get("guided_only")], ["photo-review"])
+        for s in simulator.SCENARIOS:  # every sample sheet exists (the static site copies samples/ next to scenarios.json)
+            if "photo" in s:
+                self.assertTrue((ROOT / "algebraic_compiler" / "web" / "alexa" / s["photo"]).is_file(), s["id"])
+                self.assertFalse(s["photo"].startswith(("/", "http")), s["id"])
+
+    def post_raw(self, path, body, headers=None):
+        """A POST with the exact bytes and headers given, answered with (status, JSON)."""
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1], timeout=30)
+        try:
+            connection.request("POST", path, body=body, headers={"Content-Type": "application/json", **(headers or {})})
+            response = connection.getresponse()
+            return response.status, json.loads(response.read())
+        finally:
+            connection.close()
+
+    def test_photo_turn_is_validated_before_anything_else_and_never_a_500(self):
+        good = {"mime": "image/jpeg", "data": base64.b64encode(SAMPLE_PHOTO.read_bytes()).decode()}
+        for image, status, words in [({**good, "mime": "image/gif"}, 415, "image/jpeg"), ({**good, "data": "***"}, 400, "base64"),
+                                     ({**good, "data": ""}, 400, "empty"), ({**good, "mime": "image/png"}, 400, "not a readable"),
+                                     ({"mime": "image/png", "data": base64.b64encode(b"\x00" * (photo.MAX_BYTES + 1)).decode()}, 413, "larger than"),
+                                     ({"data": good["data"]}, 400, "{mime, data}"), ("sky", 400, "{mime, data}"), (7, 400, "{mime, data}")]:
+            code, body = self.request("/api/turn", {"session": "p", "text": "check this", "image": image})
+            self.assertEqual(code, status, str(image)[:50])
+            self.assertIn(words, body["error"])
+        # A photo alone is a request (the display asks to check the page); no text and no photo is not.
+        code, body = self.request("/api/turn", {"session": "p"})
+        self.assertEqual((code, body["error"]), (400, "Say or type something"))
+        code, body = self.request("/api/turn", {"session": "p", "image": good})
+        self.assertEqual(code, 200)
+        self.assertIn("No AI model is configured", body["reply"])
+        self.assertIn("read a photo", body["reply"])
+        self.assertTrue(body["photo"]["src"].startswith("data:image/jpeg;base64,"))
+        self.assertEqual([e["type"] for e in body["events"]], ["heard", "photo", "notice"])
+        self.assertEqual(body["events"][0]["text"], "Alexa, check Maya's homework on this page.")
+        self.assertEqual(body["events"][1]["sha256"], hashlib.sha256(SAMPLE_PHOTO.read_bytes()).hexdigest())
+        # Request-level problems are 4xx, not 500: bad length, not an object, not UTF-8, too large, wrong type, other sites.
+        for raw, status in [(b"[1, 2]", 400), (b"\xff\xfe not json", 400), (b'"text"', 400), (b"{bad", 400)]:
+            self.assertEqual(self.post_raw("/api/turn", raw)[0], status, raw)
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1], timeout=30)
+        try:  # Content-Length is checked before the body is read, so no 8 MB needs to be sent to see the refusal
+            connection.putrequest("POST", "/api/turn")
+            for name, value in (("Content-Type", "application/json"), ("Content-Length", str(simulator.MAX_IMAGE_BODY + 1))):
+                connection.putheader(name, value)
+            connection.endheaders()
+            response = connection.getresponse()
+            self.assertEqual((response.status, json.loads(response.read())["error"]), (413, "Request too large"))
+        finally:
+            connection.close()
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1], timeout=30)
+        try:
+            connection.putrequest("POST", "/api/turn")
+            for name, value in (("Content-Type", "application/json"), ("Content-Length", "twelve")):
+                connection.putheader(name, value)
+            connection.endheaders()
+            response = connection.getresponse()
+            self.assertEqual(response.status, 400)
+            response.read()
+        finally:
+            connection.close()
+        # Only a turn may carry a photo: other endpoints keep the 1 MB limit.
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1], timeout=30)
+        try:
+            connection.putrequest("POST", "/api/guided")
+            for name, value in (("Content-Type", "application/json"), ("Content-Length", str(simulator.MAX_BODY + 1))):
+                connection.putheader(name, value)
+            connection.endheaders()
+            self.assertEqual(connection.getresponse().status, 413)
+        finally:
+            connection.close()
+        req = urllib.request.Request(self.base + "/api/turn", data=json.dumps({"text": "x", "image": good}).encode(),
+                                     headers={"Content-Type": "application/json", "Origin": "http://evil.example"})
+        with self.assertRaises(urllib.error.HTTPError) as refused:
+            urllib.request.urlopen(req)
+        self.assertEqual(refused.exception.code, 403)  # the same-origin rule still applies to photos
+
+    def test_scripted_agent_loop_reads_a_photo_and_the_display_gets_the_boxes(self):
+        provider = ScriptedPhotoProvider()
+        self.host.providers, self.host.default = {"scripted": provider}, "scripted"
+        raw = SAMPLE_PHOTO.read_bytes()
+        try:
+            result = self.host.turn("photo-agent", "Alexa, check this page", None, {"mime": "image/jpeg", "data": base64.b64encode(raw).decode()})
+        finally:
+            self.host.providers, self.host.default = {}, None
+        url = "data:image/jpeg;base64," + base64.b64encode(raw).decode()
+        self.assertEqual(provider.seen, [{"type": "text", "text": "Alexa, check this page"}, {"type": "image_url", "image_url": {"url": url}}])
+        self.assertEqual([e["type"] for e in result["events"]], ["heard", "photo", "model", "tool", "model", "reply"])
+        photo_event = result["events"][1]
+        self.assertEqual((photo_event["width"], photo_event["height"], photo_event["bytes"]), (1200, 1600, len(raw)))
+        self.assertEqual(photo_event["sha256"], hashlib.sha256(raw).hexdigest())
+        self.assertEqual(result["photo"]["src"], url)
+        tool = result["events"][3]
+        self.assertEqual((tool["name"], tool["verdict"], tool["certificate_verified"]), ("check_work", "error_found", True))
+        self.assertEqual(tool["arguments"]["provenance"], ScriptedPhotoProvider.READING["provenance"])
+        view = result["card"]["result"]["structuredContent"]["view"]
+        self.assertEqual(view["focus"]["step_index"], 1)
+        self.assertEqual(view["focus"]["source"]["box"], [190, 330, 350, 360])
+        # The history keeps the picture for follow-up questions in the same session.
+        self.assertIn("image_url", json.dumps(self.host.sessions[("photo-agent", "scripted")][0]))
 
     def test_silent_model_falls_back_to_verified_suggested_speech(self):
         class Silent(ScriptedProvider):
